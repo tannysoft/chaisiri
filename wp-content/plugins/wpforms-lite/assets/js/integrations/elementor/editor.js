@@ -57,6 +57,69 @@ var WPFormsElementor = window.WPFormsElementor || ( function( document, window, 
 				// Initialize widget controls.
 				elementor.hooks.addAction( 'panel/open_editor/widget/wpforms', app.widgetPanelOpen );
 
+				// Initialize choiceJS.
+				elementorFrontend.hooks.addAction( 'frontend/element_ready/wpforms.default', app.loadChoicesJS );
+			} );
+		},
+
+		/**
+		 * Init Modern style Dropdown fields (<select>) with choiceJS.
+		 *
+		 * @since 1.9.0
+		 *
+		 * @param {Object} $scope Elementor scope object.
+		 */
+		loadChoicesJS( $scope ) {
+			// Loads if function exists.
+			if ( typeof parent.Choices !== 'function' ) {
+				return;
+			}
+
+			const $elements = $scope.find( '.wpforms-field .choicesjs-select' );
+			const config = window.wpforms_choicesjs_config || {};
+
+			// Initialize ChoicesJS.
+			$elements.each( function( index, el ) {
+				if ( ! ( el instanceof parent.HTMLSelectElement ) ) {
+					return;
+				}
+
+				const $el = $( el );
+
+				if ( $el.data( 'choicesjs' ) ) {
+					return;
+				}
+
+				const $field = $el.closest( '.wpforms-field' );
+
+				config.callbackOnInit = function() {
+					const self = this,
+						$element = $( self.passedElement.element ),
+						$input = $( self.input.element ),
+						sizeClass = $element.data( 'size-class' );
+
+					// Add CSS-class for size.
+					if ( sizeClass ) {
+						$( self.containerOuter.element ).addClass( sizeClass );
+					}
+
+					/**
+					 * If a multiple select has selected choices - hide a placeholder text.
+					 * In case if select is empty - we return placeholder text.
+					 */
+					if ( $element.prop( 'multiple' ) ) {
+						// On init event.
+						$input.data( 'placeholder', $input.attr( 'placeholder' ) );
+
+						if ( self.getValue( true ).length ) {
+							$input.removeAttr( 'placeholder' );
+						}
+					}
+
+					this.disable();
+					$field.find( '.is-disabled' ).removeClass( 'is-disabled' );
+				};
+				$el.data( 'choicesjs', new parent.Choices( el, config ) );
 			} );
 		},
 
@@ -73,7 +136,8 @@ var WPFormsElementor = window.WPFormsElementor || ( function( document, window, 
 				.on( 'click', '.wpforms-btn', app.addFormBtnClick )
 				.on( 'click', '.wpforms-admin-no-forms-container a', app.clickLinkInPreview )
 				.on( 'change', '.wpforms-elementor-form-selector select', app.selectFormInPreview )
-				.on( 'click mousedown focus keydown submit', '.wpforms-container *', app.disableEvents );
+				.on( 'click mousedown focus keydown submit', '.wpforms-container *', app.disableEvents )
+				.on( 'click', '.wpforms-comprehensive-link', app.openComprehensiveLink );
 
 			app.updateSameForms( $scope );
 		},
@@ -93,7 +157,7 @@ var WPFormsElementor = window.WPFormsElementor || ( function( document, window, 
 				formContainerId = $formContainer.attr( 'id' );
 
 			$scope
-				.closest( '.elementor-inner' )
+				.closest( '.elementor-editor-active' )
 				.find( '.elementor-widget-wpforms:not(.elementor-element-' + elementId + ')' )
 				.each( function() {
 
@@ -332,6 +396,13 @@ var WPFormsElementor = window.WPFormsElementor || ( function( document, window, 
 		 */
 		findFormSelector: function( event ) {
 
+			let view = elementor.getPanelView().getCurrentPageView();
+
+			// We need to be sure that we are on the widget Content section.
+			if ( view.activeSection && view.activeSection !== 'section_form' ) {
+				$( view.ui.tabs[0] ).trigger( 'click' );
+			}
+
 			vars.$select = event && event.$el ?
 				event.$el.closest( '#elementor-controls' ).find( 'select[data-setting="form_id"]' ) :
 				window.parent.jQuery( '#elementor-controls select[data-setting="form_id"]' );
@@ -347,7 +418,9 @@ var WPFormsElementor = window.WPFormsElementor || ( function( document, window, 
 			vars.formId = $( this ).val();
 
 			app.findFormSelector();
-			vars.$select.val( vars.formId ).trigger( 'change' );
+
+			// To be sure, that both form selector selects are in sync.
+			app.refreshFormsList( null, vars.formId );
 		},
 
 		/**
@@ -379,6 +452,22 @@ var WPFormsElementor = window.WPFormsElementor || ( function( document, window, 
 			event.stopImmediatePropagation();
 
 			return false;
+		},
+
+		/**
+		 * Open the compreshenvie guide link,
+		 * as elementor disables all links in the preview.
+		 *
+		 * @since 1.8.3
+		 *
+		 * @param {object} event Event object.
+		 */
+		openComprehensiveLink: function( event ) {
+
+			const url = $( this ).attr( 'href' );
+
+			// Open the url in a new tab with JS bc elementor doesn't allow links in the preview.
+			window.open( url, '_blank' ).focus();
 		},
 
 		/**

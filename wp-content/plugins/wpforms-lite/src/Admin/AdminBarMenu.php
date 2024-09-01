@@ -96,9 +96,9 @@ class AdminBarMenu {
 			wp_add_inline_style(
 				'wpforms-admin-bar',
 				sprintf(
-					'#wpadminbar .wpforms-menu-notification-counter, #wpadminbar .wpforms-menu-notification-indicator { 
+					'#wpadminbar .wpforms-menu-notification-counter, #wpadminbar .wpforms-menu-notification-indicator {
 						background-color: %s !important;
-						color: #ffffff !important; 
+						color: #ffffff !important;
 					}',
 					version_compare( get_bloginfo( 'version' ), '5.7', '<' ) ? '#ca4a1f' : '#d63638'
 				)
@@ -113,9 +113,8 @@ class AdminBarMenu {
 	 */
 	public function enqueue_js() {
 
-		// In WordPress 5.3.1 the `admin-bar.js` file was rewritten and removed all jQuery dependencies.
-		$is_wp_531_plus = version_compare( get_bloginfo( 'version' ), '5.3.1', '>=' );
-		$inline_script  = sprintf(
+		wp_add_inline_script(
+			'admin-bar',
 			"( function() {
 				function wpforms_admin_bar_menu_init() {
 					var template = document.getElementById( 'tmpl-wpforms-admin-menubar-data' ),
@@ -137,12 +136,10 @@ class AdminBarMenu {
 						notifications.insertAdjacentHTML( 'afterend', template.innerHTML );
 					}
 				};
-				%s
+				document.addEventListener( 'DOMContentLoaded', wpforms_admin_bar_menu_init );
 			}() );",
-			$is_wp_531_plus ? "document.addEventListener( 'DOMContentLoaded', wpforms_admin_bar_menu_init );" : "if ( typeof( jQuery ) != 'undefined' ) { jQuery( wpforms_admin_bar_menu_init ); } else { document.addEventListener( 'DOMContentLoaded', wpforms_admin_bar_menu_init ); }"
+			'before'
 		);
-
-		wp_add_inline_script( 'admin-bar', $inline_script, 'before' );
 	}
 
 	/**
@@ -160,6 +157,7 @@ class AdminBarMenu {
 				'main_menu',
 				'notification_menu',
 				'all_forms_menu',
+				'all_payments_menu',
 				'add_new_menu',
 				'community_menu',
 				'support_menu',
@@ -244,6 +242,30 @@ class AdminBarMenu {
 	}
 
 	/**
+	 * Render All Payments admin bar menu item.
+	 *
+	 * @since 1.8.4
+	 *
+	 * @param WP_Admin_Bar $wp_admin_bar WordPress Admin Bar object.
+	 */
+	public function all_payments_menu( WP_Admin_Bar $wp_admin_bar ) {
+
+		$wp_admin_bar->add_menu(
+			[
+				'parent' => 'wpforms-menu',
+				'id'     => 'wpforms-payments',
+				'title'  => esc_html__( 'Payments', 'wpforms-lite' ),
+				'href'   => add_query_arg(
+					[
+						'page' => 'wpforms-payments',
+					],
+					admin_url( 'admin.php' )
+				),
+			]
+		);
+	}
+
+	/**
 	 * Render Add New admin bar menu item.
 	 *
 	 * @since 1.6.0
@@ -323,6 +345,7 @@ class AdminBarMenu {
 	 * Get form data for JS to modify the admin bar menu.
 	 *
 	 * @since 1.6.5
+	 * @since 1.8.4 Added the View Payments link.
 	 *
 	 * @param array $forms Forms array.
 	 *
@@ -334,9 +357,12 @@ class AdminBarMenu {
 			'has_notifications' => $this->has_notifications(),
 			'edit_text'         => esc_html__( 'Edit Form', 'wpforms-lite' ),
 			'entry_text'        => esc_html__( 'View Entries', 'wpforms-lite' ),
+			'payment_text'      => esc_html__( 'View Payments', 'wpforms-lite' ),
 			'survey_text'       => esc_html__( 'Survey Results', 'wpforms-lite' ),
 			'forms'             => [],
 		];
+
+		$admin_url = admin_url( 'admin.php' );
 
 		foreach ( $forms as $form ) {
 			$form_id = absint( $form['id'] );
@@ -345,10 +371,10 @@ class AdminBarMenu {
 				continue;
 			}
 
-			/* translators: %d - Form ID */
+			/* translators: %d - form ID. */
 			$form_title = sprintf( esc_html__( 'Form ID: %d', 'wpforms-lite' ), $form_id );
 
-			if ( ! empty( $form['settings'] ) && ! empty( $form['settings']['form_title'] ) ) {
+			if ( ! empty( $form['settings']['form_title'] ) ) {
 				$form_title = wp_html_excerpt(
 					sanitize_text_field( $form['settings']['form_title'] ),
 					99,
@@ -356,12 +382,28 @@ class AdminBarMenu {
 				);
 			}
 
+			$has_payments = wpforms()->get( 'payment' )->get_by( 'form_id', $form_id );
+
 			$data['forms'][] = apply_filters(
 				'wpforms_admin_adminbarmenu_get_form_data',
 				[
-					'form_id'  => $form_id,
-					'title'    => $form_title,
-					'edit_url' => admin_url( 'admin.php?page=wpforms-builder&view=fields&form_id=' . $form_id ),
+					'form_id'      => $form_id,
+					'title'        => $form_title,
+					'edit_url'     => add_query_arg(
+						[
+							'page'    => 'wpforms-builder',
+							'view'    => 'fields',
+							'form_id' => $form_id,
+						],
+						$admin_url
+					),
+					'payments_url' => $has_payments ? add_query_arg(
+						[
+							'page'    => 'wpforms-payments',
+							'form_id' => $form_id,
+						],
+						$admin_url
+					) : '',
 				]
 			);
 		}
@@ -382,7 +424,8 @@ class AdminBarMenu {
 			return;
 		}
 
-		echo wpforms_render( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		echo wpforms_render(
 			'admin-bar-menu',
 			[
 				'forms_data' => $this->get_forms_data( $forms ),

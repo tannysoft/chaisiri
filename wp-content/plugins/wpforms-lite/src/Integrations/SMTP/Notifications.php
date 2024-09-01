@@ -20,7 +20,7 @@ class Notifications implements IntegrationInterface {
 	 */
 	public function allow_load() {
 
-		return wpforms_is_admin_page( 'builder' );
+		return wpforms_is_admin_page( 'builder' ) || wpforms_is_admin_ajax();
 	}
 
 	/**
@@ -40,7 +40,56 @@ class Notifications implements IntegrationInterface {
 	 */
 	private function hooks() {
 
-		add_filter( 'wpforms_builder_notifications_sender_address_settings', [ $this, 'change_from_email_settings' ], 10, 3 );
+		add_filter( 'wpforms_builder_notifications_sender_address_settings', [ $this, 'change_from_email_settings' ], PHP_INT_MIN, 3 );
+		add_filter( 'wpforms_builder_notifications_sender_name_settings', [ $this, 'change_from_name_settings' ], PHP_INT_MIN, 3 );
+		add_action( 'wp_ajax_wpforms_builder_notification_from_email_validate', [ $this, 'notification_from_email_validate' ] );
+		add_filter( 'wpforms_builder_strings', [ $this, 'form_builder_strings' ], 10, 2 );
+	}
+
+	/**
+	 * Validate email.
+	 *
+	 * @since 1.8.1
+	 */
+	public function notification_from_email_validate() {
+
+		check_ajax_referer( 'wpforms-builder', 'nonce' );
+
+		// Before checking if $_POST['email'] is valid email, we need to check if smart tag is used and return its value.
+		$email = ! empty( $_POST['email'] ) ? sanitize_text_field( wp_unslash( $_POST['email'] ) ) : '';
+		$email = $email ? sanitize_email( wpforms_process_smart_tags( $email, [], [], '' ) ) : '';
+
+		if ( ! is_email( $email ) ) {
+			wp_send_json_error(
+				sprintf(
+					'<div class="wpforms-alert wpforms-alert-warning wpforms-alert-warning-wide">%s</div>',
+					__( 'Please enter a valid email address. Your notifications won\'t be sent if the field is not filled in correctly.', 'wpforms-lite' )
+				)
+			);
+		}
+
+		if ( ! $this->email_domain_matches_site_domain( $email ) ) {
+			wp_send_json_error( $this->get_warning_message() );
+		}
+
+		wp_send_json_success();
+	}
+
+	/**
+	 * Append additional strings for form builder.
+	 *
+	 * @since 1.8.1
+	 *
+	 * @param array  $strings List of strings.
+	 * @param object $form    Current form object.
+	 *
+	 * @return array
+	 */
+	public function form_builder_strings( $strings, $form ) {
+
+		$strings['allow_only_one_email'] = esc_html__( 'Notifications can only use 1 From Email. Please do not enter multiple addresses.', 'wpforms-lite' );
+
+		return $strings;
 	}
 
 	/**
@@ -56,39 +105,111 @@ class Notifications implements IntegrationInterface {
 	 */
 	public function change_from_email_settings( $args, $form_data, $id ) {
 
-		$email = empty( $form_data['settings']['notifications'][ $id ]['sender_address'] ) ? '{admin_email}' : $form_data['settings']['notifications'][ $id ]['sender_address'];
+		// phpcs:disable WPForms.PHP.ValidateHooks.InvalidHookName
+		/** This filter is documented in lite/wpforms-lite.php */
+		$from_email_after = apply_filters( 'wpforms_builder_notifications_from_email_after', '', $form_data, $id );
+		// phpcs:enable WPForms.PHP.ValidateHooks.InvalidHookName
 
-		if ( $this->email_domain_matches_site_domain( $email ) || $this->has_active_smtp_plugin() ) {
-			return $args;
+		if ( ! empty( $from_email_after ) ) {
+			$default = [
+				'readonly'    => true,
+				'after'       => '<div class="wpforms-alert wpforms-alert-warning">' . $from_email_after . '</div>',
+				'input_class' => 'wpforms-disabled',
+				'class'       => 'from-email wpforms-panel-field-warning',
+			];
+		} else {
+			$default = [
+				'class'   => 'from-email js-wpforms-from-email-validation',
+				'tooltip' => esc_html__( 'Notifications can only use 1 From Email. Please do not enter multiple addresses.', 'wpforms-lite' ),
+			];
 		}
 
-		$site_domain               = wp_parse_url( get_bloginfo( 'wpurl' ) )['host'];
+		$args = wp_parse_args( $args, $default );
+
+		return $args;
+	}
+
+	/**
+	 * Add warning message when name empty.
+	 *
+	 * @since 1.8.4
+	 *
+	 * @param array $args      Field settings.
+	 * @param array $form_data Form data.
+	 * @param int   $id        Notification ID.
+	 *
+	 * @return array
+	 */
+	public function change_from_name_settings( $args, $form_data, $id ) {
+
+		// phpcs:disable WPForms.PHP.ValidateHooks.InvalidHookName
+		/** This filter is documented in lite/wpforms-lite.php */
+		$from_name_after = apply_filters( 'wpforms_builder_notifications_from_name_after', '', $form_data, $id );
+		// phpcs:enable WPForms.PHP.ValidateHooks.InvalidHookName
+
+		if ( ! empty( $from_name_after ) ) {
+			$default = [
+				'readonly'    => true,
+				'after'       => '<div class="wpforms-alert wpforms-alert-warning">' . $from_name_after . '</div>',
+				'input_class' => 'wpforms-disabled',
+				'class'       => 'from-name wpforms-panel-field-warning',
+			];
+		} else {
+			$default = [
+				'class' => 'from-name',
+			];
+		}
+
+		return wp_parse_args( $args, $default );
+	}
+
+	/**
+	 * Get warning message.
+	 *
+	 * @since 1.8.1
+	 *
+	 * @return string
+	 */
+	private function get_warning_message() {
+
+		$site_domain = wp_parse_url( get_bloginfo( 'wpurl' ) )['host'];
+
 		$email_does_not_match_text = sprintf( /* translators: %1$s - WordPress site domain. */
 			__( 'The current \'From Email\' address does not match your website domain name (%1$s). This can cause your notification emails to be blocked or marked as spam.', 'wpforms-lite' ),
 			esc_html( $site_domain )
 		);
-		$install_wp_mail_smtp_text = sprintf(
-			wp_kses( /* translators: %1$s - WP Mail SMTP install page URL. */
-				__(
-					'We strongly recommend that you install the free <a href="%1$s" target="_blank">WP Mail SMTP</a> plugin! The Setup Wizard makes it easy to fix your emails.',
-					'wpforms-lite'
-				),
-				[
-					'a' => [
-						'href'   => [],
-						'target' => [],
-					],
-				]
-			),
-			esc_url( admin_url( 'admin.php?page=wpforms-smtp' ) )
-		);
 
-		$address_match_text      = sprintf( /* translators: %1$s - WordPress site domain. */
-			__( 'Alternately, try using a From Address that matches your website domain (no-reply@%1$s).', 'wpforms-lite' ),
+		$install_wp_mail_smtp_text = '';
+
+		// If WP Mail SMTP is not active, show a message to install it.
+		if (
+			! is_plugin_active( 'wp-mail-smtp-pro/wp_mail_smtp.php' ) &&
+			! is_plugin_active( 'wp-mail-smtp/wp_mail_smtp.php' )
+		) {
+			$install_wp_mail_smtp_text .= sprintf(
+				wp_kses( /* translators: %1$s - WP Mail SMTP install page URL. */
+					__(
+						'We strongly recommend that you install the free <a href="%1$s" target="_blank">WP Mail SMTP</a> plugin! The Setup Wizard makes it easy to fix your emails.',
+						'wpforms-lite'
+					),
+					[
+						'a' => [
+							'href'   => [],
+							'target' => [],
+						],
+					]
+				),
+				esc_url( admin_url( 'admin.php?page=wpforms-smtp' ) )
+			);
+		}
+
+		$address_match_text = sprintf( /* translators: %1$s - WordPress site domain. */
+			__( 'Alternately, try using a From Address that matches your website domain (admin@%1$s).', 'wpforms-lite' ),
 			esc_html( $site_domain )
 		);
+
 		$fix_email_delivery_text = sprintf(
-			wp_kses( /* translators: %1$s - Fixing email delivery issues doc URL. */
+			wp_kses( /* translators: %1$s - fixing email delivery issues doc URL. */
 				__(
 					'Please check out our <a href="%1$s" target="_blank" rel="noopener noreferrer">doc on fixing email delivery issues</a> for more details.',
 					'wpforms-lite'
@@ -101,22 +222,16 @@ class Notifications implements IntegrationInterface {
 					],
 				]
 			),
-			esc_url( wpforms_utm_link( 'https://wpforms.com/docs/how-to-fix-wordpress-contact-form-not-sending-email-with-smtp/', 'Block Settings', 'Fixing Email Delivery Issues' ) )
+			esc_url( wpforms_utm_link( 'https://wpforms.com/docs/how-to-fix-wordpress-contact-form-not-sending-email-with-smtp/', 'Builder Notifications', 'Delivery Issues Documentation' ) )
 		);
 
-		$from_email_after = sprintf(
-			'<p>%1$s</p> <p>%2$s</p> <p>%3$s</p> <p>%4$s</p>',
+		return sprintf(
+			'<div class="wpforms-alert wpforms-alert-warning wpforms-alert-warning-wide"> <p>%1$s</p> <p>%2$s</p> <p>%3$s</p> <p>%4$s</p> </div>',
 			$email_does_not_match_text,
 			$install_wp_mail_smtp_text,
 			$address_match_text,
 			$fix_email_delivery_text
 		);
-
-		$args['after'] = '<div class="wpforms-alert wpforms-alert-warning wpforms-alert-warning-wide">' . $from_email_after . '</div>';
-
-		$args['class'] .= ' wpforms-panel-field-warning';
-
-		return $args;
 	}
 
 	/**

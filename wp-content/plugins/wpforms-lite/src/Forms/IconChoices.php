@@ -29,7 +29,7 @@ class IconChoices {
 	 *
 	 * @var string
 	 */
-	const FONT_AWESOME_VERSION = '6.2.1';
+	const FONT_AWESOME_VERSION = '6.4.0';
 
 	/**
 	 * Default icon.
@@ -56,7 +56,10 @@ class IconChoices {
 	 *
 	 * @var string
 	 */
-	const DEFAULT_COLOR = '#0399ed';
+	const DEFAULT_COLOR = [
+		'classic' => '#0399ed',
+		'modern'  => '#066aab',
+	];
 
 	/**
 	 * How many icons to display initially and paginate in the Icon Picker.
@@ -169,6 +172,18 @@ class IconChoices {
 	}
 
 	/**
+	 * Get Font Awesome library data file.
+	 *
+	 * @since 1.8.3
+	 *
+	 * @return string
+	 */
+	public function get_icons_data_file() {
+
+		return $this->icons_data_file;
+	}
+
+	/**
 	 * Whether Font Awesome library is already installed or not.
 	 *
 	 * @since 1.7.9
@@ -201,16 +216,35 @@ class IconChoices {
 	}
 
 	/**
-	 * Install Font Awesome library from our server.
+	 * Install Font Awesome library via Ajax.
 	 *
 	 * @since 1.7.9
 	 */
-	public function install() { // phpcs:ignore WPForms.PHP.HooksMethod.InvalidPlaceForAddingHooks
+	public function install() {
 
 		check_ajax_referer( 'wpforms-builder', 'nonce' );
 
+		$this->run_install( $this->cache_base_path );
+		$this->is_installed = true;
+
+		wp_send_json_success();
+	}
+
+	/**
+	 * Run Install Font Awesome library from our server.
+	 *
+	 * @since 1.8.3
+	 *
+	 * @param string $destination Destination path.
+	 */
+	public function run_install( $destination ) { // phpcs:ignore WPForms.PHP.HooksMethod.InvalidPlaceForAddingHooks
+
 		// WordPress assumes it's a plugin/theme and tries to get translations. We don't need that, and it breaks JS output.
 		remove_action( 'upgrader_process_complete', [ 'Language_Pack_Upgrader', 'async_upgrade' ], 20 );
+
+		if ( ! function_exists( 'request_filesystem_credentials' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/file.php';
+		}
 
 		require_once WPFORMS_PLUGIN_DIR . 'includes/admin/class-install-skin.php';
 
@@ -222,13 +256,9 @@ class IconChoices {
 		$installer->run(
 			[
 				'package'     => self::FONT_AWESOME_URL,
-				'destination' => $this->cache_base_path,
+				'destination' => $destination,
 			]
 		);
-
-		$this->is_installed = true;
-
-		wp_send_json_success();
 	}
 
 	/**
@@ -295,7 +325,7 @@ class IconChoices {
 		$properties['input_container']['class'][] = sanitize_html_class( 'wpforms-icon-choices-' . $field['choices_icons_size'] );
 
 		$icon_color = isset( $field['choices_icons_color'] ) ? wpforms_sanitize_hex_color( $field['choices_icons_color'] ) : '';
-		$icon_color = empty( $icon_color ) ? self::DEFAULT_COLOR : $icon_color;
+		$icon_color = empty( $icon_color ) ? self::get_default_color() : $icon_color;
 
 		$properties['input_container']['attr']['style'] = "--wpforms-icon-choices-color: {$icon_color};";
 
@@ -330,6 +360,10 @@ class IconChoices {
 		// Only Payment fields supply a custom label.
 		if ( ! $label ) {
 			$label = $choice['label']['text'];
+		}
+
+		if ( is_array( $choice['label']['class'] ) && wpforms_is_empty_string( $label ) ) {
+			$choice['label']['class'][] = 'wpforms-field-label-inline-empty';
 		}
 
 		printf(
@@ -456,7 +490,7 @@ class IconChoices {
 			'is_active'          => $this->is_active(),
 			'default_icon'       => self::DEFAULT_ICON,
 			'default_icon_style' => self::DEFAULT_ICON_STYLE,
-			'default_color'      => self::DEFAULT_COLOR,
+			'default_color'      => self::get_default_color(),
 			'icons'              => [],
 			'icons_per_page'     => self::DEFAULT_ICONS_PER_PAGE,
 			'strings'            => [
@@ -555,5 +589,19 @@ class IconChoices {
 		}
 
 		return (array) json_decode( $icons, false );
+	}
+
+	/**
+	 * Get default accent color.
+	 *
+	 * @since 1.8.1
+	 *
+	 * @return string
+	 */
+	public static function get_default_color() {
+
+		$render_engine = wpforms_get_render_engine();
+
+		return array_key_exists( $render_engine, self::DEFAULT_COLOR ) ? self::DEFAULT_COLOR[ $render_engine ] : self::DEFAULT_COLOR['modern'];
 	}
 }

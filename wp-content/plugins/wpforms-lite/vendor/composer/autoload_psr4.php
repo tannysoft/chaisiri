@@ -6,10 +6,10 @@ $vendorDir = dirname(dirname(__FILE__));
 $baseDir = dirname($vendorDir);
 
 return array(
-    'WPForms\\' => array($baseDir . '/src'),
-    'TrueBV\\' => array($vendorDir . '/true/punycode/src'),
-    'TijsVerkoyen\\CssToInlineStyles\\' => array($vendorDir . '/tijsverkoyen/css-to-inline-styles/src'),
+    'WPForms\\Tests\\Unit\\' => array($baseDir . '/tests/unit'),
+    'WPForms\\Tests\\Integration\\' => array($baseDir . '/tests/integration'),
+    'WPForms\\Scoper\\' => array($baseDir . '/../.php-scoper'),
+    'WPForms\\' => array($baseDir . '/src', $baseDir . '/src'),
     'Symfony\\Polyfill\\Mbstring\\' => array($vendorDir . '/symfony/polyfill-mbstring'),
     'Symfony\\Polyfill\\Iconv\\' => array($vendorDir . '/symfony/polyfill-iconv'),
-    'Symfony\\Component\\CssSelector\\' => array($vendorDir . '/symfony/css-selector'),
 );

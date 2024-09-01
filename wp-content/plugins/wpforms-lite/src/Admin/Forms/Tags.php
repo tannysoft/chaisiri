@@ -4,7 +4,6 @@ namespace WPForms\Admin\Forms;
 
 use WP_Post;
 use WPForms_Form_Handler;
-use WPForms_Overview_Table;
 
 /**
  * Tags on All Forms page.
@@ -151,7 +150,7 @@ class Tags {
 			'wpforms-admin-forms-overview-choicesjs',
 			WPFORMS_PLUGIN_URL . 'assets/lib/choices.min.js',
 			[],
-			'9.0.1',
+			'10.2.0',
 			true
 		);
 
@@ -186,6 +185,7 @@ class Tags {
 			'searchFloor'       => 1,
 			'searchResultLimit' => 100,
 			'searchFields'      => [ 'label' ],
+			'allowHTML'         => true,
 			// These `fuseOptions` options enable the search of chars not only from the beginning of the tags.
 			'fuseOptions'       => [
 				'threshold' => 0.1,
@@ -239,7 +239,7 @@ class Tags {
 	 */
 	private function is_tags_column_hidden() {
 
-		$overview_table = WPForms_Overview_Table::get_instance();
+		$overview_table = ListTable::get_instance();
 		$columns        = $overview_table->__call( 'get_column_info', [] );
 
 		return isset( $columns[1] ) && in_array( 'tags', $columns[1], true );
@@ -263,7 +263,7 @@ class Tags {
 				__( '<strong>1 form</strong> selected for Bulk Edit.', 'wpforms-lite' ),
 				[ 'strong' => [] ]
 			),
-			'bulk_edit_n_forms'        => wp_kses( /* translators: %d - Number of forms selected for Bulk Edit. */
+			'bulk_edit_n_forms'        => wp_kses( /* translators: %d - number of forms selected for Bulk Edit. */
 				__( '<strong>%d forms</strong> selected for Bulk Edit.', 'wpforms-lite' ),
 				[ 'strong' => [] ]
 			),
@@ -274,7 +274,7 @@ class Tags {
 				__( 'You have <strong>1 tag</strong> selected for deletion.', 'wpforms-lite' ),
 				[ 'strong' => [] ]
 			),
-			'manage_tags_n_tags'       => wp_kses( /* translators: %d - Number of forms selected for Bulk Edit. */
+			'manage_tags_n_tags'       => wp_kses( /* translators: %d - number of forms selected for Bulk Edit. */
 				__( 'You have <strong>%d tags</strong> selected for deletion.', 'wpforms-lite' ),
 				[ 'strong' => [] ]
 			),
@@ -283,7 +283,7 @@ class Tags {
 				[ 'br' => [] ]
 			),
 			'manage_tags_one_deleted'  => esc_html__( '1 tag was successfully deleted.', 'wpforms-lite' ),
-			/* translators: %d - Number of deleted tags. */
+			/* translators: %d - number of deleted tags. */
 			'manage_tags_n_deleted'    => esc_html__( '%d tags were successfully deleted.', 'wpforms-lite' ),
 			'manage_tags_result_title' => esc_html__( 'Almost done!', 'wpforms-lite' ),
 			'manage_tags_result_text'  => esc_html__( 'In order to update the tags in the forms list, please refresh the page.', 'wpforms-lite' ),
@@ -389,7 +389,7 @@ class Tags {
 		}
 
 		return [
-			/* translators: Used between list items, there is a space after the comma. */
+			/* translators: used between list items, there is a space after the comma. */
 			'tags_links'   => implode( __( ', ', 'wpforms-lite' ), $tags_links ),
 			'tags_ids'     => implode( ',', array_filter( $tags_ids ) ),
 			'tags_options' => implode( '', $tags_options ),
@@ -460,8 +460,8 @@ class Tags {
 	 *
 	 * @since 1.7.5
 	 *
-	 * @param string                 $which          The location of the table navigation: 'top' or 'bottom'.
-	 * @param WPForms_Overview_Table $overview_table Instance of the WPForms_Overview_Table class.
+	 * @param string    $which          The location of the table navigation: 'top' or 'bottom'.
+	 * @param ListTable $overview_table Instance of the ListTable class.
 	 */
 	public function extra_tablenav( $which, $overview_table ) {
 
@@ -522,7 +522,7 @@ class Tags {
 	 *
 	 * @since 1.7.5
 	 *
-	 * @param WPForms_Overview_Table $list_table Overview lit table object.
+	 * @param ListTable $list_table Overview list table object.
 	 */
 	public function bulk_edit_tags( $list_table ) {
 

@@ -80,6 +80,15 @@ abstract class WPForms_Template {
 	public $url = '';
 
 	/**
+	 * Form template thumbnail url.
+	 *
+	 * @since 1.8.2
+	 *
+	 * @var string
+	 */
+	public $thumbnail = '';
+
+	/**
 	 * Array of data that is assigned to the post_content on form creation.
 	 *
 	 * @since 1.0.0
@@ -161,6 +170,7 @@ abstract class WPForms_Template {
 			'icon'        => $this->icon,
 			'url'         => ! empty( $this->url ) ? $this->url : '',
 			'plugin_dir'  => $this->get_plugin_dir(),
+			'thumbnail'   => ! empty( $this->thumbnail ) ? $this->thumbnail : '',
 		];
 
 		return $templates;
@@ -173,9 +183,9 @@ abstract class WPForms_Template {
 	 *
 	 * @return string
 	 */
-	private function get_plugin_dir() {
+	private function get_plugin_dir(): string {
 
-		$reflection         = new \ReflectionClass( $this );
+		$reflection         = new ReflectionClass( $this );
 		$template_file_path = wp_normalize_path( $reflection->getFileName() );
 
 		// Cutting out the WP_PLUGIN_DIR from the beginning of the template file path.
@@ -196,19 +206,25 @@ abstract class WPForms_Template {
 	 *
 	 * @return array
 	 */
-	public function template_data( $args, $data ) {
+	public function template_data( $args, $data ): array {
 
-		if ( ! empty( $data ) && ! empty( $data['template'] ) ) {
-			if ( $data['template'] === $this->slug ) {
-
-				// Enable Notifications by default.
-				$this->data['settings']['notification_enable'] = isset( $this->data['settings']['notification_enable'] )
-					? $this->data['settings']['notification_enable']
-					: 1;
-
-				$args['post_content'] = wpforms_encode( $this->data );
-			}
+		if ( empty( $data['template'] ) || $data['template'] !== $this->slug ) {
+			return $args;
 		}
+
+		// Enable Notifications by default.
+		$this->data['settings']['notification_enable'] = $this->data['settings']['notification_enable'] ?? '1';
+
+		/**
+		 * Allow modifying form data when a template is applied to the new form.
+		 *
+		 * @since 1.9.0
+		 *
+		 * @param array $form_data New form data.
+		 */
+		$this->data = (array) apply_filters( 'wpforms_templates_class_base_template_modify_data', $this->data );
+
+		$args['post_content'] = wpforms_encode( $this->data );
 
 		return $args;
 	}
@@ -224,7 +240,7 @@ abstract class WPForms_Template {
 	 *
 	 * @return array
 	 */
-	public function template_replace( $form, $data, $args ) {
+	public function template_replace( $form, $data, $args ): array { // phpcs:ignore Generic.Metrics.CyclomaticComplexity.TooHigh
 
 		// We should proceed only if the template slug passed via $args['template'] is equal to the current template slug.
 		// This will work only for offline templates: Blank Form, all the Addons Templates, and all the custom templates.
@@ -242,12 +258,20 @@ abstract class WPForms_Template {
 		}
 
 		// Compile the new form data preserving needed data from the existing form.
-		$new                     = $this->data;
-		$new['id']               = isset( $form_data['id'] ) ? $form_data['id'] : 0;
-		$new['settings']         = isset( $form_data['settings'] ) ? $form_data['settings'] : [];
-		$new['payments']         = isset( $form_data['payments'] ) ? $form_data['payments'] : [];
-		$new['meta']             = isset( $form_data['meta'] ) ? $form_data['meta'] : [];
-		$new['meta']['template'] = isset( $this->data['meta']['template'] ) ? $this->data['meta']['template'] : '';
+		$new             = $this->data;
+		$new['id']       = $form_data['id'] ?? 0;
+		$new['settings'] = $form_data['settings'] ?? [];
+		$new['payments'] = $form_data['payments'] ?? [];
+		$new['meta']     = $form_data['meta'] ?? [];
+
+		$template_id = $this->data['meta']['template'] ?? '';
+
+		// Preserve template ID `wpforms-user-template-{$form_id}` when overwriting it with core template.
+		if ( wpforms_is_form_template( $form['ID'] ) ) {
+			$template_id = $form_data['meta']['template'] ?? '';
+		}
+
+		$new['meta']['template'] = $template_id;
 
 		/**
 		 * Allow modifying form data when a template is replaced.
@@ -311,7 +335,7 @@ abstract class WPForms_Template {
 	 *
 	 * @return bool
 	 */
-	public function template_modal_conditional( $form_data ) {
+	public function template_modal_conditional( $form_data ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.Found
 
 		return false;
 	}

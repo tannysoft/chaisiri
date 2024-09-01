@@ -22,22 +22,29 @@ class PageTitle extends SmartTag {
 	 */
 	public function get_value( $form_data, $fields = [], $entry_id = '' ) {
 
+		$page_title = $this->get_meta( $entry_id, 'page_title' );
+
+		if ( ! empty( $page_title ) ) {
+			return wp_kses_post( $page_title );
+		}
+
 		// phpcs:disable WordPress.Security.NonceVerification.Missing
-		if ( ! empty( $_POST['page_title'] ) ) {
-			return sanitize_text_field( wp_unslash( $_POST['page_title'] ) );
+		if ( ! empty( $_POST['page_title'] ) && ! is_array( $_POST['page_title'] ) ) {
+			return wp_kses_post( wp_unslash( $_POST['page_title'] ) );
 		}
 		// phpcs:enable WordPress.Security.NonceVerification.Missing
 
-		/*
-		 * In most cases `wp_title()` returns the value we're going to use, except:
-		 * - on static front page (we can use page title as a fallback),
-		 * - on standard front page with the latest post (we can use the site name as a fallback).
-		 */
 		if ( is_front_page() ) {
 			return wp_kses_post( is_page() ? get_the_title( get_the_ID() ) : get_bloginfo( 'name' ) );
 		}
 
-		return $this->get_wp_title();
+		$title = $this->get_gutenberg_page_title();
+
+		if ( $title ) {
+			return wp_kses_post( $title );
+		}
+
+		return wp_kses_post( $this->get_wp_title() );
 	}
 
 	/**
@@ -59,7 +66,11 @@ class PageTitle extends SmartTag {
 			$wp_filter['wp_title']->callbacks = [];
 		}
 
-		// Get the raw value.
+		/*
+		 * In most cases `wp_title()` returns the value we're going to use, except:
+		 * - on static front page (we can use page title as a fallback),
+		 * - on standard front page with the latest post (we can use the site name as a fallback).
+		 */
 		$title = trim( wp_title( '', false ) );
 
 		// Run through the default transformations WordPress does on this hook.
@@ -74,5 +85,18 @@ class PageTitle extends SmartTag {
 		}
 
 		return $title;
+	}
+
+	/**
+	 * Retrieve title in Gutenberg editor.
+	 *
+	 * @since 1.9.0
+	 *
+	 * @return string
+	 */
+	private function get_gutenberg_page_title(): string {
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return wp_kses_post( sanitize_text_field( wp_unslash( $_GET['attributes']['pageTitle'] ?? '' ) ) );
 	}
 }

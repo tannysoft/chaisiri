@@ -38,7 +38,7 @@ abstract class FormBuilder implements FormBuilderInterface {
 	 *
 	 * @var array
 	 */
-	protected $form_data = array();
+	protected $form_data = [];
 
 	/**
 	 * Integrations constructor.
@@ -52,11 +52,11 @@ abstract class FormBuilder implements FormBuilderInterface {
 		$this->core = $core;
 
 		if ( ! empty( $_GET['form_id'] ) ) { // phpcs:ignore
-			$this->form_data = \wpforms()->form->get(
+			$this->form_data = wpforms()->get( 'form' )->get(
 				\absint( $_GET['form_id'] ), // phpcs:ignore
-				array(
+				[
 					'content_only' => true,
-				)
+				]
 			);
 		}
 
@@ -71,11 +71,11 @@ abstract class FormBuilder implements FormBuilderInterface {
 	protected function init_hooks() {
 
 		// Register builder HTML template(s).
-		\add_action( 'wpforms_builder_print_footer_scripts', array( $this, 'builder_templates' ), 10 );
-		\add_action( 'wpforms_builder_print_footer_scripts', array( $this, 'builder_custom_templates' ), 11 );
+		add_action( 'wpforms_builder_print_footer_scripts', [ $this, 'builder_templates' ], 10 );
+		add_action( 'wpforms_builder_print_footer_scripts', [ $this, 'builder_custom_templates' ], 11 );
 
 		// Process builder AJAX requests.
-		\add_action( "wp_ajax_wpforms_builder_provider_ajax_{$this->core->slug}", array( $this, 'process_ajax' ) );
+		add_action( "wp_ajax_wpforms_builder_provider_ajax_{$this->core->slug}", [ $this, 'process_ajax' ] );
 
 		/*
 		 * Enqueue assets.
@@ -83,10 +83,12 @@ abstract class FormBuilder implements FormBuilderInterface {
 		if (
 			( ! empty( $_GET['page'] ) && $_GET['page'] === 'wpforms-builder' ) && // phpcs:ignore
 			! empty( $_GET['form_id'] ) && // phpcs:ignore
-			\is_admin()
+			is_admin()
 		) {
-			\add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+			add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 		}
+
+		add_filter( 'wpforms_save_form_args', [ $this, 'remove_connection_locks' ], 1, 3 );
 	}
 
 	/**
@@ -98,14 +100,14 @@ abstract class FormBuilder implements FormBuilderInterface {
 	public function builder_templates() {
 
 		$cl_builder_block = wpforms_conditional_logic()->builder_block(
-			array(
+			[
 				'form'       => $this->form_data,
 				'type'       => 'panel',
 				'parent'     => 'providers',
 				'panel'      => esc_attr( $this->core->slug ),
 				'subsection' => '%connection_id%',
 				'reference'  => esc_html__( 'Marketing provider connection', 'wpforms-lite' ),
-			),
+			],
 			false
 		);
 		?>
@@ -267,16 +269,16 @@ abstract class FormBuilder implements FormBuilderInterface {
 
 		\wp_enqueue_script(
 			'wpforms-admin-builder-templates',
-			WPFORMS_PLUGIN_URL . "assets/js/components/admin/builder/templates{$min}.js",
-			array( 'wp-util' ),
+			WPFORMS_PLUGIN_URL . "assets/js/admin/builder/templates{$min}.js",
+			[ 'wp-util' ],
 			WPFORMS_VERSION,
 			true
 		);
 
 		\wp_enqueue_script(
 			'wpforms-admin-builder-providers',
-			WPFORMS_PLUGIN_URL . "assets/js/components/admin/builder/providers{$min}.js",
-			array( 'wpforms-utils', 'wpforms-builder', 'wpforms-admin-builder-templates' ),
+			WPFORMS_PLUGIN_URL . "assets/js/admin/builder/providers{$min}.js",
+			[ 'wpforms-utils', 'wpforms-builder', 'wpforms-admin-builder-templates' ],
 			WPFORMS_VERSION,
 			true
 		);
@@ -290,25 +292,25 @@ abstract class FormBuilder implements FormBuilderInterface {
 	public function process_ajax() {
 
 		// Run a security check.
-		\check_ajax_referer( 'wpforms-builder', 'nonce' );
+		check_ajax_referer( 'wpforms-builder', 'nonce' );
 
 		// Check for permissions.
-		if ( ! \wpforms_current_user_can( 'edit_forms' ) ) {
-			\wp_send_json_error(
-				array(
-					'error' => \esc_html__( 'You do not have permission to perform this action.', 'wpforms-lite' ),
-				)
+		if ( ! wpforms_current_user_can( 'edit_forms' ) ) {
+			wp_send_json_error(
+				[
+					'error' => esc_html__( 'You do not have permission to perform this action.', 'wpforms-lite' ),
+				]
 			);
 		}
 
 		// Process required values.
-		$error = array( 'error' => \esc_html__( 'Something went wrong while performing an AJAX request.', 'wpforms-lite' ) );
+		$error = [ 'error' => esc_html__( 'Something went wrong while performing an AJAX request.', 'wpforms-lite' ) ];
 
 		if (
 			empty( $_POST['id'] ) ||
 			empty( $_POST['task'] )
 		) {
-			\wp_send_json_error( $error );
+			wp_send_json_error( $error );
 		}
 
 		$form_id = (int) $_POST['id'];
@@ -328,19 +330,23 @@ abstract class FormBuilder implements FormBuilderInterface {
 
 		// Do not allow to proceed further, as form_id may be incorrect.
 		if ( empty( $this->form_data ) ) {
-			\wp_send_json_error( $error );
+			wp_send_json_error( $error );
 		}
 
-		$data = \apply_filters(
+		$data = apply_filters( // phpcs:ignore WPForms.Comments.PHPDocHooks.RequiredHookDocumentation, WPForms.PHP.ValidateHooks.InvalidHookName
 			'wpforms_providers_settings_builder_ajax_' . $task . '_' . $this->core->slug,
 			null
 		);
 
-		if ( null !== $data ) {
-			\wp_send_json_success( $data );
+		if ( ! empty( $data['error_msg'] ) ) {
+			wp_send_json_error( [ 'error_msg' => $data['error_msg'] ] );
 		}
 
-		\wp_send_json_error( $error );
+		if ( $data !== null ) {
+			wp_send_json_success( $data );
+		}
+
+		wp_send_json_error( $error );
 	}
 
 	/**
@@ -356,12 +362,12 @@ abstract class FormBuilder implements FormBuilderInterface {
 			$configured = 'configured';
 		}
 
-		$classes = array(
+		$classes = [
 			'wpforms-panel-sidebar-section',
 			'icon',
 			$configured,
 			'wpforms-panel-sidebar-section-' . $this->core->slug,
-		);
+		];
 		?>
 
 		<a href="#" class="<?php echo \esc_attr( \implode( ' ', $classes ) ); ?>"
@@ -405,6 +411,8 @@ abstract class FormBuilder implements FormBuilderInterface {
 				$this->core->name,
 				$this->core->icon
 			);
+
+			$this->display_lock_field();
 			?>
 
 			<div class="wpforms-builder-provider-body">
@@ -412,7 +420,6 @@ abstract class FormBuilder implements FormBuilderInterface {
 					<div class="wpforms-builder-provider-connections"></div>
 				</div>
 			</div>
-
 		</div>
 
 		<?php
@@ -446,7 +453,7 @@ abstract class FormBuilder implements FormBuilderInterface {
 				 */
 				echo apply_filters( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 					"wpforms_providers_provider_settings_formbuilder_display_content_default_screen_{$slug}",
-					sprintf( /* translators: %s - Provider name. */
+					sprintf( /* translators: %s - provider name. */
 						'<p>' . esc_html__( 'Get the most out of WPForms &mdash; use it with an active %s account.', 'wpforms-lite' ) . '</p>',
 						esc_html( $name )
 					)
@@ -454,6 +461,21 @@ abstract class FormBuilder implements FormBuilderInterface {
 				?>
 			</div>
 		</div>
+		<?php
+	}
+
+	/**
+	 * Display the lock field.
+	 *
+	 * @since 1.8.9
+	 */
+	protected function display_lock_field() {
+
+		if ( ! $this->is_lock_field_required( $this->core->slug ) ) {
+			return;
+		}
+		?>
+		<input type="hidden" class="wpforms-builder-provider-connections-save-lock" value="1" name="providers[<?php echo esc_attr( $this->core->slug ); ?>][__lock__]">
 		<?php
 	}
 
@@ -490,5 +512,59 @@ abstract class FormBuilder implements FormBuilderInterface {
 		</div>
 
 		<?php
+	}
+
+	/**
+	 * Determine whether the lock field is required.
+	 *
+	 * @WPFormsBackCompat Support Drip v1.7.0 and earlier, support Uncanny Automator.
+	 *
+	 * @since 1.8.9
+	 *
+	 * @param string $provider The provider slug.
+	 *
+	 * @return bool
+	 */
+	protected function is_lock_field_required( string $provider ): bool {
+
+		// Compatibility with the legacy Drip addon versions where the lock field was not needed.
+		// Uncanny Automator do not have lock field.
+		if ( in_array( $provider, [ 'uncanny-automator', 'drip' ], true ) ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Temporary fix to remove __lock__ field with value 1 from the form post_content.
+	 * In the future, it will be handled in save_form() method in the core for all providers.
+	 *
+	 * @since 1.8.9
+	 *
+	 * @param array $form Form array, usable with wp_update_post.
+	 * @param array $data Data retrieved from $_POST and processed.
+	 * @param array $args Update form arguments.
+	 *
+	 * @return array
+	 */
+	public function remove_connection_locks( $form, $data, $args ) {
+
+		$form_data = json_decode( stripslashes( $form['post_content'] ), true );
+
+		if ( empty( $form_data['providers'][ $this->core->slug ] ) ) {
+			return $form;
+		}
+
+		$provider = $form_data['providers'][ $this->core->slug ];
+		$lock     = '__lock__';
+
+		// Remove the lock field if it's the only one and it's locked.
+		if ( isset( $provider[ $lock ] ) && count( $provider ) === 1 && absint( $provider[ $lock ] ) === 1 ) {
+			unset( $form_data['providers'][ $this->core->slug ]['__lock__'] );
+			$form['post_content'] = wpforms_encode( $form_data );
+		}
+
+		return $form;
 	}
 }

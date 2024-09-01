@@ -81,16 +81,16 @@ class Addons {
 	public function notices() {
 
 		$notice = sprintf(
-			'<p><strong>%1$s</strong></p>
+			'<p class="notice-title"><strong>%1$s</strong></p>
              <p>%2$s</p>
-             <p>
-                 <a href="%3$s" class="wpforms-btn wpforms-btn-orange wpforms-btn-md" rel="noopener noreferrer">
+             <p class="notice-buttons">
+                 <a href="%3$s" class="wpforms-btn wpforms-btn-orange wpforms-btn-md" target="_blank" rel="noopener noreferrer">
                      %4$s
                  </a>
              </p>',
-			esc_html__( 'WPForms Addons are a PRO feature', 'wpforms-lite' ),
-			esc_html__( 'Please upgrade to PRO to unlock our addons, advanced form fields, and more!', 'wpforms-lite' ),
-			esc_url( wpforms_admin_upgrade_link( 'addons' ) ),
+			esc_html__( 'Upgrade to Unlock WPForms Addons', 'wpforms-lite' ),
+			esc_html__( 'Access powerful marketing and payment integrations, advanced form fields, and more when you purchase our Plus, Pro, or Elite plans.', 'wpforms-lite' ),
+			esc_url( wpforms_admin_upgrade_link( 'addons', 'All Addons' ) ),
 			esc_html__( 'Upgrade Now', 'wpforms-lite' )
 		);
 
@@ -112,6 +112,10 @@ class Addons {
 		if ( empty( $addons ) ) {
 			return;
 		}
+
+		// WPForms 1.8.7 core includes Custom Captcha.
+		// The Custom Captcha addon will only work on WPForms 1.8.6 and earlier versions.
+		unset( $addons['wpforms-captcha'] );
 
 		echo wpforms_render( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 			'admin/addons',

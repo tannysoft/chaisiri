@@ -1,5 +1,9 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Form builder that contains magic.
  *
@@ -97,6 +101,7 @@ class WPForms_Builder {
 
 			add_action( 'admin_init', [ self::$instance, 'init' ], 10 );
 			add_action( 'admin_init', [ self::$instance, 'deregister_common_wp_admin_styles' ], PHP_INT_MAX );
+			add_action( 'load-wpforms_page_wpforms-builder', [ self::$instance, 'process_actions' ] );
 		}
 
 		return self::$instance;
@@ -238,6 +243,112 @@ class WPForms_Builder {
 	}
 
 	/**
+	 * Process form actions.
+	 *
+	 * @since 1.8.8
+	 */
+	public function process_actions() {
+
+		$form_id = isset( $_GET['form_id'] ) ? (int) $_GET['form_id'] : 0;
+		$action  = isset( $_REQUEST['action'] ) ? sanitize_key( $_REQUEST['action'] ) : false;
+		$nonce   = isset( $_GET['_wpnonce'] ) ? sanitize_key( $_GET['_wpnonce'] ) : false;
+
+		if ( ! $this->is_allowed_action( $form_id, $action ) ) {
+			return;
+		}
+
+		if ( ! wp_verify_nonce( $nonce, 'wpforms_' . $action . '_form_nonce' ) ) {
+			return;
+		}
+
+		$this->process_action( $form_id, $action );
+	}
+
+	/**
+	 * Check whether the form action is valid and allowed.
+	 *
+	 * @since 1.8.8
+	 *
+	 * @param int    $form_id Form ID.
+	 * @param string $action  Action name.
+	 *
+	 * @return bool
+	 */
+	private function is_allowed_action( int $form_id, string $action ): bool {
+
+		if ( empty( $form_id ) || empty( $action ) ) {
+			return false;
+		}
+
+		return in_array( $action, [ 'save_as_template', 'template_to_form', 'duplicate' ], true );
+	}
+
+	/**
+	 * Process a single form action.
+	 *
+	 * The action can be triggered via URL:
+	 *   wp_nonce_url(
+	 *       add_query_arg( [ 'action' => '<action>', 'form_id' => $form_id ] ),
+	 *      'wpforms_save_as_template_form_nonce'
+	 *   );
+	 *
+	 * @since 1.8.8
+	 *
+	 * @param int    $form_id Form ID.
+	 * @param string $action  Action name.
+	 */
+	private function process_action( int $form_id, string $action ) {
+
+		$form_handler = wpforms()->get( 'form' );
+
+		$id = false;
+
+		if ( $action === 'save_as_template' ) {
+			$id = $form_handler->convert( $form_id, 'template' );
+		}
+
+		if ( $action === 'template_to_form' ) {
+			$id = $form_handler->convert( $form_id, 'form' );
+		}
+
+		if ( $action === 'duplicate' ) {
+			$ids = $form_handler->duplicate( $form_id );
+			$id  = ! empty( $ids ) ? current( $ids ) : false;
+		}
+
+		// Reload the form builder with the target object.
+		if ( ! empty( $id ) ) {
+			wp_safe_redirect( $this->get_edit_url( $id, $this->view ) );
+			exit;
+		}
+	}
+
+	/**
+	 * Get the form edit URL.
+	 *
+	 * @since 1.8.8
+	 *
+	 * @param string|int $form_id Form ID.
+	 * @param string     $view    View name.
+	 *
+	 * @return string
+	 */
+	private function get_edit_url( $form_id, string $view = '' ): string {
+
+		if ( empty( $view ) || ! in_array( $view, $this->panels, true ) ) {
+			$view = 'fields';
+		}
+
+		return add_query_arg(
+			[
+				'view'    => $view,
+				'form_id' => $form_id,
+			],
+			admin_url( 'admin.php?page=wpforms-builder' )
+		);
+	}
+
+	/**
 	 * Define TinyMCE buttons to use with our fancy editor instances.
 	 *
 	 * @since 1.0.3
@@ -316,9 +427,7 @@ class WPForms_Builder {
 	 */
 	public function enqueues() {
 
-		// Remove conflicting scripts.
-		wp_deregister_script( 'serialize-object' );
-		wp_deregister_script( 'wpclef-ajax-settings' );
+		$this->suppress_conflicts();
 
 		do_action( 'wpforms_builder_enqueues_before', $this->view );
 
@@ -365,18 +474,19 @@ class WPForms_Builder {
 			'4.2.6'
 		);
 
+		// jQuery.Confirm Reloaded.
 		wp_enqueue_style(
 			'jquery-confirm',
 			WPFORMS_PLUGIN_URL . 'assets/lib/jquery.confirm/jquery-confirm.min.css',
 			null,
-			'3.3.4'
+			'1.0.0'
 		);
 
 		wp_enqueue_style(
 			'minicolors',
 			WPFORMS_PLUGIN_URL . 'assets/lib/jquery.minicolors/jquery.minicolors.min.css',
 			null,
-			'2.2.6'
+			'2.3.6'
 		);
 
 		// Remove TinyMCE editor styles from third-party themes and plugins.
@@ -397,11 +507,12 @@ class WPForms_Builder {
 			'4.2.6'
 		);
 
+		// jQuery.Confirm Reloaded.
 		wp_enqueue_script(
 			'jquery-confirm',
 			WPFORMS_PLUGIN_URL . 'assets/lib/jquery.confirm/jquery-confirm.min.js',
 			[ 'jquery' ],
-			'3.3.4'
+			'1.0.0'
 		);
 
 		wp_enqueue_script(
@@ -415,21 +526,21 @@ class WPForms_Builder {
 			'minicolors',
 			WPFORMS_PLUGIN_URL . 'assets/lib/jquery.minicolors/jquery.minicolors.min.js',
 			[ 'jquery' ],
-			'2.2.6'
+			'2.3.6'
 		);
 
 		wp_enqueue_script(
 			'conditionals',
 			WPFORMS_PLUGIN_URL . 'assets/lib/jquery.conditionals.min.js',
 			[ 'jquery' ],
-			'1.0.0'
+			'1.0.1'
 		);
 
 		wp_enqueue_script(
 			'choicesjs',
 			WPFORMS_PLUGIN_URL . 'assets/lib/choices.min.js',
 			[],
-			'9.0.1'
+			'10.2.0'
 		);
 
 		wp_enqueue_script(
@@ -443,7 +554,7 @@ class WPForms_Builder {
 			'dom-purify',
 			WPFORMS_PLUGIN_URL . 'assets/lib/purify.min.js',
 			[],
-			'2.4.0'
+			'3.0.10'
 		);
 
 		if ( wp_is_mobile() ) {
@@ -452,14 +563,14 @@ class WPForms_Builder {
 
 		wp_enqueue_script(
 			'wpforms-utils',
-			WPFORMS_PLUGIN_URL . "assets/js/admin-utils{$min}.js",
+			WPFORMS_PLUGIN_URL . "assets/js/admin/share/admin-utils{$min}.js",
 			[ 'jquery', 'dom-purify' ],
 			WPFORMS_VERSION
 		);
 
 		wp_enqueue_script(
 			'wpforms-generic-utils',
-			WPFORMS_PLUGIN_URL . "assets/js/utils{$min}.js",
+			WPFORMS_PLUGIN_URL . "assets/js/share/utils{$min}.js",
 			[ 'jquery' ],
 			WPFORMS_VERSION
 		);
@@ -472,8 +583,16 @@ class WPForms_Builder {
 		);
 
 		wp_enqueue_script(
+			'wpforms-admin-builder-dropdown-list',
+			WPFORMS_PLUGIN_URL . "assets/js/admin/builder/dropdown-list{$min}.js",
+			[ 'jquery' ],
+			WPFORMS_VERSION,
+			true
+		);
+
+		wp_enqueue_script(
 			'wpforms-builder',
-			WPFORMS_PLUGIN_URL . "assets/js/admin-builder{$min}.js",
+			WPFORMS_PLUGIN_URL . "assets/js/admin/builder/admin-builder{$min}.js",
 			[
 				'wpforms-utils',
 				'wpforms-admin-builder-templates',
@@ -489,7 +608,7 @@ class WPForms_Builder {
 
 		wp_enqueue_script(
 			'wpforms-admin-builder-templates',
-			WPFORMS_PLUGIN_URL . "assets/js/components/admin/builder/templates{$min}.js",
+			WPFORMS_PLUGIN_URL . "assets/js/admin/builder/templates{$min}.js",
 			[ 'wp-util' ],
 			WPFORMS_VERSION,
 			true
@@ -499,12 +618,6 @@ class WPForms_Builder {
 			'wpforms-builder',
 			'wpforms_builder',
 			$this->get_localized_strings()
-		);
-
-		wp_localize_script(
-			'wpforms-builder',
-			'wpforms_addons',
-			$this->get_localized_addons()
 		);
 
 		/**
@@ -521,6 +634,21 @@ class WPForms_Builder {
 	}
 
 	/**
+	 * Remove conflicting scripts and styles.
+	 *
+	 * @since 1.9.0
+	 */
+	private function suppress_conflicts() {
+
+		// Remove conflicting styles (e.g., WP JobSearch plugin).
+		wp_deregister_style( 'font-awesome' );
+
+		// Remove conflicting scripts.
+		wp_deregister_script( 'serialize-object' );
+		wp_deregister_script( 'wpclef-ajax-settings' );
+	}
+
+	/**
 	 * Get localized strings.
 	 *
 	 * @since 1.6.8
@@ -529,145 +657,185 @@ class WPForms_Builder {
 	 */
 	private function get_localized_strings() {
 
+		/**
+		 * Smart Tags.
+		 *
+		 * @since 1.6.7
+		 *
+		 * @param array $smart_tags Array of smart tags.
+		 */
+		$smart_tags = apply_filters( 'wpforms_builder_enqueues_smart_tags', wpforms()->get( 'smart_tags' )->get_smart_tags() );
+
+		$image_extensions = wpforms_chain( get_allowed_mime_types() )
+			->map(
+				static function ( $mime ) {
+
+					return strpos( $mime, 'image/' ) === 0 ? $mime : '';
+				}
+			)
+			->array_filter()
+			->array_values()
+			->value();
+
 		$strings = [
-			'and'                            => esc_html__( 'And', 'wpforms-lite' ),
-			'ajax_url'                       => admin_url( 'admin-ajax.php' ),
-			'bulk_add_button'                => esc_html__( 'Add New Choices', 'wpforms-lite' ),
-			'bulk_add_show'                  => esc_html__( 'Bulk Add', 'wpforms-lite' ),
-			'are_you_sure_to_close'          => esc_html__( 'Are you sure you want to leave? You have unsaved changes', 'wpforms-lite' ),
-			'bulk_add_hide'                  => esc_html__( 'Hide Bulk Add', 'wpforms-lite' ),
-			'bulk_add_heading'               => esc_html__( 'Add Choices (one per line)', 'wpforms-lite' ),
-			'bulk_add_placeholder'           => esc_html__( "Blue\nRed\nGreen", 'wpforms-lite' ),
-			'bulk_add_presets_show'          => esc_html__( 'Show presets', 'wpforms-lite' ),
-			'bulk_add_presets_hide'          => esc_html__( 'Hide presets', 'wpforms-lite' ),
-			'date_select_day'                => 'DD',
-			'date_select_month'              => 'MM',
-			'debug'                          => wpforms_debug(),
-			'dynamic_choice_limit'           => sprintf( /* translators: %1$s - data source name (e.g. Categories, Posts), %2$s - data source type (e.g. post type, taxonomy), %3$s - display limit, %4$s - total number of items. */
-				esc_html__( 'The %1$s %2$s contains over %3$s items (%4$s). This may make the field difficult for your visitors to use and/or cause the form to be slow.', 'wpforms-lite' ),
-				'{source}',
-				'{type}',
-				'{limit}',
-				'{total}'
-			),
-			'cancel'                         => esc_html__( 'Cancel', 'wpforms-lite' ),
-			'ok'                             => esc_html__( 'OK', 'wpforms-lite' ),
-			'close'                          => esc_html__( 'Close', 'wpforms-lite' ),
-			'conditionals_change'            => esc_html__( 'Due to form changes, conditional logic rules will be removed or updated:', 'wpforms-lite' ),
-			'conditionals_disable'           => esc_html__( 'Are you sure you want to disable conditional logic? This will remove the rules for this field or setting.', 'wpforms-lite' ),
-			'field'                          => esc_html__( 'Field', 'wpforms-lite' ),
-			'field_locked'                   => esc_html__( 'Field Locked', 'wpforms-lite' ),
-			'field_locked_msg'               => esc_html__( 'This field cannot be deleted or duplicated.', 'wpforms-lite' ),
-			'field_locked_no_delete_msg'     => esc_html__( 'This field cannot be deleted.', 'wpforms-lite' ),
-			'field_locked_no_duplicate_msg'  => esc_html__( 'This field cannot be duplicated.', 'wpforms-lite' ),
-			'fields_available'               => esc_html__( 'Available Fields', 'wpforms-lite' ),
-			'fields_unavailable'             => esc_html__( 'No fields available', 'wpforms-lite' ),
-			'heads_up'                       => esc_html__( 'Heads up!', 'wpforms-lite' ),
-			'image_placeholder'              => WPFORMS_PLUGIN_URL . 'assets/images/builder/placeholder-200x125.svg',
-			'nonce'                          => wp_create_nonce( 'wpforms-builder' ),
-			'admin_nonce'                    => wp_create_nonce( 'wpforms-admin' ),
-			'no_email_fields'                => esc_html__( 'No email fields', 'wpforms-lite' ),
-			'notification_delete'            => esc_html__( 'Are you sure you want to delete this notification?', 'wpforms-lite' ),
-			'notification_prompt'            => esc_html__( 'Enter a notification name', 'wpforms-lite' ),
-			'notification_ph'                => esc_html__( 'Eg: User Confirmation', 'wpforms-lite' ),
-			'notification_error'             => esc_html__( 'You must provide a notification name', 'wpforms-lite' ),
-			'notification_def_name'          => esc_html__( 'Default Notification', 'wpforms-lite' ),
-			'confirmation_delete'            => esc_html__( 'Are you sure you want to delete this confirmation?', 'wpforms-lite' ),
-			'confirmation_prompt'            => esc_html__( 'Enter a confirmation name', 'wpforms-lite' ),
-			'confirmation_ph'                => esc_html__( 'Eg: Alternative Confirmation', 'wpforms-lite' ),
-			'confirmation_error'             => esc_html__( 'You must provide a confirmation name', 'wpforms-lite' ),
-			'confirmation_def_name'          => esc_html__( 'Default Confirmation', 'wpforms-lite' ),
-			'save'                           => esc_html__( 'Save', 'wpforms-lite' ),
-			'saving'                         => esc_html__( 'Saving', 'wpforms-lite' ),
-			'saved'                          => esc_html__( 'Saved!', 'wpforms-lite' ),
-			'save_exit'                      => esc_html__( 'Save and Exit', 'wpforms-lite' ),
-			'save_embed'                     => esc_html__( 'Save and Embed', 'wpforms-lite' ),
-			'saved_state'                    => '',
-			'layout_selector_show'           => esc_html__( 'Show Layouts', 'wpforms-lite' ),
-			'layout_selector_hide'           => esc_html__( 'Hide Layouts', 'wpforms-lite' ),
-			'layout_selector_layout'         => esc_html__( 'Select your layout', 'wpforms-lite' ),
-			'layout_selector_column'         => esc_html__( 'Select your column', 'wpforms-lite' ),
-			'loading'                        => esc_html__( 'Loading', 'wpforms-lite' ),
-			'template_name'                  => ! empty( $this->template['name'] ) ? $this->template['name'] : '',
-			'template_slug'                  => ! empty( $this->template['slug'] ) ? $this->template['slug'] : '',
-			'template_modal_title'           => ! empty( $this->template['modal']['title'] ) ? $this->template['modal']['title'] : '',
-			'template_modal_msg'             => ! empty( $this->template['modal']['message'] ) ? $this->template['modal']['message'] : '',
-			'template_modal_display'         => ! empty( $this->template['modal_display'] ) ? $this->template['modal_display'] : '',
-			'template_select'                => esc_html__( 'Use Template', 'wpforms-lite' ),
-			'template_confirm'               => esc_html__( 'Changing templates on an existing form will DELETE existing form fields. Are you sure you want apply the new template?', 'wpforms-lite' ),
-			'use_simple_contact_form'        => esc_html__( 'Use Simple Contact Form Template', 'wpforms-lite' ),
-			'embed'                          => esc_html__( 'Embed', 'wpforms-lite' ),
-			'exit'                           => esc_html__( 'Exit', 'wpforms-lite' ),
-			'exit_url'                       => wpforms_current_user_can( 'view_forms' ) ? admin_url( 'admin.php?page=wpforms-overview' ) : admin_url(),
-			'exit_confirm'                   => esc_html__( 'Your form contains unsaved changes. Would you like to save your changes first.', 'wpforms-lite' ),
-			'delete_confirm'                 => esc_html__( 'Are you sure you want to delete this field?', 'wpforms-lite' ),
-			'delete_choice_confirm'          => esc_html__( 'Are you sure you want to delete this choice?', 'wpforms-lite' ),
-			'duplicate_confirm'              => esc_html__( 'Are you sure you want to duplicate this field?', 'wpforms-lite' ),
-			'duplicate_copy'                 => esc_html__( '(copy)', 'wpforms-lite' ),
-			'error_title'                    => esc_html__( 'Please enter a form name.', 'wpforms-lite' ),
-			'error_choice'                   => esc_html__( 'This item must contain at least one choice.', 'wpforms-lite' ),
-			'off'                            => esc_html__( 'Off', 'wpforms-lite' ),
-			'on'                             => esc_html__( 'On', 'wpforms-lite' ),
-			'or'                             => esc_html__( 'or', 'wpforms-lite' ),
-			'other'                          => esc_html__( 'Other', 'wpforms-lite' ),
-			'operator_is'                    => esc_html__( 'is', 'wpforms-lite' ),
-			'operator_is_not'                => esc_html__( 'is not', 'wpforms-lite' ),
-			'operator_empty'                 => esc_html__( 'empty', 'wpforms-lite' ),
-			'operator_not_empty'             => esc_html__( 'not empty', 'wpforms-lite' ),
-			'operator_contains'              => esc_html__( 'contains', 'wpforms-lite' ),
-			'operator_not_contains'          => esc_html__( 'does not contain', 'wpforms-lite' ),
-			'operator_starts'                => esc_html__( 'starts with', 'wpforms-lite' ),
-			'operator_ends'                  => esc_html__( 'ends with', 'wpforms-lite' ),
-			'operator_greater_than'          => esc_html__( 'greater than', 'wpforms-lite' ),
-			'operator_less_than'             => esc_html__( 'less than', 'wpforms-lite' ),
-			'payments_entries_off'           => esc_html__( 'Entry storage is currently disabled, but is required to accept payments. Please enable in your form settings.', 'wpforms-lite' ),
-			'payments_on_entries_off'        => esc_html__( 'This form is currently accepting payments. Entry storage is required to accept payments. To disable entry storage, please first disable payments.', 'wpforms-lite' ),
-			'previous'                       => esc_html__( 'Previous', 'wpforms-lite' ),
-			'provider_required_flds'         => sprintf( /* translators: %s - marketing integration name. */
+			'and'                                     => esc_html__( 'And', 'wpforms-lite' ),
+			'ajax_url'                                => admin_url( 'admin-ajax.php' ),
+			'bulk_add_button'                         => esc_html__( 'Add New Choices', 'wpforms-lite' ),
+			'bulk_add_show'                           => esc_html__( 'Bulk Add', 'wpforms-lite' ),
+			'are_you_sure_to_close'                   => esc_html__( 'Are you sure you want to leave? You have unsaved changes', 'wpforms-lite' ),
+			'bulk_add_hide'                           => esc_html__( 'Hide Bulk Add', 'wpforms-lite' ),
+			'bulk_add_heading'                        => esc_html__( 'Add Choices (one per line)', 'wpforms-lite' ),
+			'bulk_add_placeholder'                    => esc_html__( "Blue\nRed\nGreen", 'wpforms-lite' ),
+			'bulk_add_presets_show'                   => esc_html__( 'Show presets', 'wpforms-lite' ),
+			'bulk_add_presets_hide'                   => esc_html__( 'Hide presets', 'wpforms-lite' ),
+			'date_select_day'                         => 'DD',
+			'date_select_month'                       => 'MM',
+			'debug'                                   => wpforms_debug(),
+			'dynamic_choices'                         => [
+				'limit_message' => sprintf( /* translators: %1$s - data source name (e.g. Categories, Posts), %2$s - data source type (e.g. post type, taxonomy), %3$s - display limit, %4$s - total number of items. */
+					esc_html__( 'The %1$s %2$s contains over %3$s items (%4$s). This may make the field difficult for your visitors to use and/or cause the form to be slow.', 'wpforms-lite' ),
+					'{source}',
+					'{type}',
+					'{limit}',
+					'{total}'
+				),
+				'empty_message' => sprintf( /* translators: %1$s - data source name (e.g. Categories, Posts), %2$s - data source type (e.g. post type, taxonomy). */
+					esc_html__( 'This field will not be displayed in your form since there are no %2$s belonging to %1$s.', 'wpforms-lite' ),
+					'{source}',
+					'{type}'
+				),
+				'entities'      => [
+					'post_type' => esc_html__( 'posts', 'wpforms-lite' ),
+					'taxonomy'  => esc_html__( 'terms', 'wpforms-lite' ),
+				],
+			],
+			'cancel'                                  => esc_html__( 'Cancel', 'wpforms-lite' ),
+			'ok'                                      => esc_html__( 'OK', 'wpforms-lite' ),
+			'close'                                   => esc_html__( 'Close', 'wpforms-lite' ),
+			'conditionals_change'                     => esc_html__( 'Due to form changes, conditional logic rules will be removed or updated:', 'wpforms-lite' ),
+			'conditionals_disable'                    => esc_html__( 'Are you sure you want to disable conditional logic? This will remove the rules for this field or setting.', 'wpforms-lite' ),
+			'field'                                   => esc_html__( 'Field', 'wpforms-lite' ),
+			'field_locked'                            => esc_html__( 'Field Locked', 'wpforms-lite' ),
+			'field_locked_msg'                        => esc_html__( 'This field cannot be deleted or duplicated.', 'wpforms-lite' ),
+			'field_locked_no_delete_msg'              => esc_html__( 'This field cannot be deleted.', 'wpforms-lite' ),
+			'field_locked_no_duplicate_msg'           => esc_html__( 'This field cannot be duplicated.', 'wpforms-lite' ),
+			'fields_available'                        => esc_html__( 'Available Fields', 'wpforms-lite' ),
+			'fields_unavailable'                      => esc_html__( 'No fields available', 'wpforms-lite' ),
+			'heads_up'                                => esc_html__( 'Heads up!', 'wpforms-lite' ),
+			'image_placeholder'                       => WPFORMS_PLUGIN_URL . 'assets/images/builder/placeholder-200x125.svg',
+			'nonce'                                   => wp_create_nonce( 'wpforms-builder' ),
+			'admin_nonce'                             => wp_create_nonce( 'wpforms-admin' ),
+			'no_email_fields'                         => esc_html__( 'No email fields', 'wpforms-lite' ),
+			'notification_delete'                     => esc_html__( 'Are you sure you want to delete this notification?', 'wpforms-lite' ),
+			'notification_prompt'                     => esc_html__( 'Enter a notification name', 'wpforms-lite' ),
+			'notification_ph'                         => esc_html__( 'Eg: User Confirmation', 'wpforms-lite' ),
+			'notification_error'                      => esc_html__( 'You must provide a notification name', 'wpforms-lite' ),
+			'notification_def_name'                   => esc_html__( 'Default Notification', 'wpforms-lite' ),
+			'confirmation_delete'                     => esc_html__( 'Are you sure you want to delete this confirmation?', 'wpforms-lite' ),
+			'confirmation_prompt'                     => esc_html__( 'Enter a confirmation name', 'wpforms-lite' ),
+			'confirmation_ph'                         => esc_html__( 'Eg: Alternative Confirmation', 'wpforms-lite' ),
+			'confirmation_error'                      => esc_html__( 'You must provide a confirmation name', 'wpforms-lite' ),
+			'confirmation_def_name'                   => esc_html__( 'Default Confirmation', 'wpforms-lite' ),
+			'save'                                    => esc_html__( 'Save', 'wpforms-lite' ),
+			'saving'                                  => esc_html__( 'Saving', 'wpforms-lite' ),
+			'saved'                                   => esc_html__( 'Saved!', 'wpforms-lite' ),
+			'save_exit'                               => esc_html__( 'Save and Exit', 'wpforms-lite' ),
+			'save_embed'                              => esc_html__( 'Save and Embed', 'wpforms-lite' ),
+			'saved_state'                             => '',
+			'layout_selector_show'                    => esc_html__( 'Show Layouts', 'wpforms-lite' ),
+			'layout_selector_hide'                    => esc_html__( 'Hide Layouts', 'wpforms-lite' ),
+			'layout_selector_layout'                  => esc_html__( 'Select your layout', 'wpforms-lite' ),
+			'layout_selector_column'                  => esc_html__( 'Select your column', 'wpforms-lite' ),
+			'loading'                                 => esc_html__( 'Loading', 'wpforms-lite' ),
+			'template_name'                           => ! empty( $this->template['name'] ) ? $this->template['name'] : '',
+			'template_slug'                           => ! empty( $this->template['slug'] ) ? $this->template['slug'] : '',
+			'template_modal_title'                    => ! empty( $this->template['modal']['title'] ) ? $this->template['modal']['title'] : '',
+			'template_modal_msg'                      => ! empty( $this->template['modal']['message'] ) ? $this->template['modal']['message'] : '',
+			'template_modal_display'                  => ! empty( $this->template['modal_display'] ) ? $this->template['modal_display'] : '',
+			'template_select'                         => esc_html__( 'Use Template', 'wpforms-lite' ),
+			'template_confirm'                        => esc_html__( 'Changing the template on this form will delete existing fields, reset external connections, and unsaved changes will be lost. Are you sure you want to apply the new template?', 'wpforms-lite' ),
+			'use_default_template'                    => esc_html__( 'Use Default Template', 'wpforms-lite' ),
+			'embed'                                   => esc_html__( 'Embed', 'wpforms-lite' ),
+			'exit'                                    => esc_html__( 'Exit', 'wpforms-lite' ),
+			'exit_url'                                => wpforms_current_user_can( 'view_forms' ) ? admin_url( 'admin.php?page=wpforms-overview' ) : admin_url(),
+			'exit_confirm'                            => esc_html__( 'Your form contains unsaved changes. Would you like to save your changes first.', 'wpforms-lite' ),
+			'delete_confirm'                          => esc_html__( 'Are you sure you want to delete this field?', 'wpforms-lite' ),
+			'delete_choice_confirm'                   => esc_html__( 'Are you sure you want to delete this choice?', 'wpforms-lite' ),
+			'duplicate_confirm'                       => esc_html__( 'Are you sure you want to duplicate this field?', 'wpforms-lite' ),
+			'duplicate_copy'                          => esc_html__( '(copy)', 'wpforms-lite' ),
+			'error_title'                             => esc_html__( 'Please enter a form name.', 'wpforms-lite' ),
+			'error_choice'                            => esc_html__( 'This item must contain at least one choice.', 'wpforms-lite' ),
+			'off'                                     => esc_html__( 'Off', 'wpforms-lite' ),
+			'on'                                      => esc_html__( 'On', 'wpforms-lite' ),
+			'or'                                      => esc_html__( 'or', 'wpforms-lite' ),
+			'other'                                   => esc_html__( 'Other', 'wpforms-lite' ),
+			'operator_is'                             => esc_html__( 'is', 'wpforms-lite' ),
+			'operator_is_not'                         => esc_html__( 'is not', 'wpforms-lite' ),
+			'operator_empty'                          => esc_html__( 'empty', 'wpforms-lite' ),
+			'operator_not_empty'                      => esc_html__( 'not empty', 'wpforms-lite' ),
+			'operator_contains'                       => esc_html__( 'contains', 'wpforms-lite' ),
+			'operator_not_contains'                   => esc_html__( 'does not contain', 'wpforms-lite' ),
+			'operator_starts'                         => esc_html__( 'starts with', 'wpforms-lite' ),
+			'operator_ends'                           => esc_html__( 'ends with', 'wpforms-lite' ),
+			'operator_greater_than'                   => esc_html__( 'greater than', 'wpforms-lite' ),
+			'operator_less_than'                      => esc_html__( 'less than', 'wpforms-lite' ),
+			'payments_entries_off'                    => esc_html__( 'Entry storage is currently disabled, but is required to accept payments. Please enable in your form settings.', 'wpforms-lite' ),
+			'payments_on_entries_off'                 => esc_html__( 'This form is currently accepting payments. Entry storage is required to accept payments. To disable entry storage, please first disable payments.', 'wpforms-lite' ),
+			'previous'                                => esc_html__( 'Previous', 'wpforms-lite' ),
+			'provider_required_flds'                  => sprintf( /* translators: %s - marketing integration name. */
 				esc_html__( "In order to complete your form's %s integration, please check that the dropdowns for all required (*) List Fields have been filled out.", 'wpforms-lite' ),
 				'{provider}'
 			),
-			'rule_create'                    => esc_html__( 'Create new rule', 'wpforms-lite' ),
-			'rule_create_group'              => esc_html__( 'Add New Group', 'wpforms-lite' ),
-			'rule_delete'                    => esc_html__( 'Delete rule', 'wpforms-lite' ),
-			'smart_tags'                     => apply_filters( 'wpforms_builder_enqueues_smart_tags', wpforms()->get( 'smart_tags' )->get_smart_tags() ),
-			'smart_tags_disabled_for_fields' => [ 'entry_id' ],
-			'smart_tags_show'                => esc_html__( 'Show Smart Tags', 'wpforms-lite' ),
-			'smart_tags_hide'                => esc_html__( 'Hide Smart Tags', 'wpforms-lite' ),
-			'select_field'                   => esc_html__( '--- Select Field ---', 'wpforms-lite' ),
-			'select_choice'                  => esc_html__( '--- Select Choice ---', 'wpforms-lite' ),
-			'upload_image_title'             => esc_html__( 'Upload or Choose Your Image', 'wpforms-lite' ),
-			'upload_image_button'            => esc_html__( 'Use Image', 'wpforms-lite' ),
-			'upload_image_remove'            => esc_html__( 'Remove Image', 'wpforms-lite' ),
-			'provider_add_new_acc_btn'       => esc_html__( 'Add', 'wpforms-lite' ),
-			'pro'                            => wpforms()->is_pro(),
-			'is_gutenberg'                   => version_compare( get_bloginfo( 'version' ), '5.0', '>=' ) && ! is_plugin_active( 'classic-editor/classic-editor.php' ),
-			'cl_fields_supported'            => wpforms_get_conditional_logic_form_fields_supported(),
-			'redirect_url_field_error'       => esc_html__( 'You should enter a valid absolute address to the Confirmation Redirect URL field.', 'wpforms-lite' ),
-			'add_custom_value_label'         => esc_html__( 'Add Custom Value', 'wpforms-lite' ),
-			'choice_empty_label_tpl'         => sprintf( /* translators: %s - choice number. */
+			'rule_create'                             => esc_html__( 'Create new rule', 'wpforms-lite' ),
+			'rule_create_group'                       => esc_html__( 'Add New Group', 'wpforms-lite' ),
+			'rule_delete'                             => esc_html__( 'Delete rule', 'wpforms-lite' ),
+			'smart_tags'                              => $smart_tags,
+			'smart_tags_disabled_for_fields'          => [ 'entry_id' ],
+			'smart_tags_show'                         => esc_html__( 'Show Smart Tags', 'wpforms-lite' ),
+			'smart_tags_hide'                         => esc_html__( 'Hide Smart Tags', 'wpforms-lite' ),
+			'select_field'                            => esc_html__( '--- Select Field ---', 'wpforms-lite' ),
+			'select_choice'                           => esc_html__( '--- Select Choice ---', 'wpforms-lite' ),
+			'upload_image_title'                      => esc_html__( 'Upload or Choose Your Image', 'wpforms-lite' ),
+			'upload_image_button'                     => esc_html__( 'Use Image', 'wpforms-lite' ),
+			'upload_image_remove'                     => esc_html__( 'Remove Image', 'wpforms-lite' ),
+			'upload_image_extensions'                 => $image_extensions,
+			'upload_image_extensions_error'           => esc_html__( 'You tried uploading a file type that is not allowed. Please try again.', 'wpforms-lite' ),
+			'provider_add_new_acc_btn'                => esc_html__( 'Add', 'wpforms-lite' ),
+			'pro'                                     => wpforms()->is_pro(),
+			'is_gutenberg'                            => ! is_plugin_active( 'classic-editor/classic-editor.php' ),
+			'cl_fields_supported'                     => wpforms_get_conditional_logic_form_fields_supported(),
+			'redirect_url_field_error'                => esc_html__( 'You should enter a valid absolute address to the Confirmation Redirect URL field.', 'wpforms-lite' ),
+			'add_custom_value_label'                  => esc_html__( 'Add Custom Value', 'wpforms-lite' ),
+			'choice_empty_label_tpl'                  => sprintf( /* translators: %s - choice number. */
 				esc_html__( 'Choice %s', 'wpforms-lite' ),
 				'{number}'
 			),
-			'error_save_form'                => esc_html__( 'Something went wrong while saving the form. Please reload the page and try again.', 'wpforms-lite' ),
-			'error_contact_support'          => esc_html__( 'Please contact the plugin support team if this behavior persists.', 'wpforms-lite' ),
-			'ms_win_css_url'                 => WPFORMS_PLUGIN_URL . 'assets/css/builder/builder-ms-win.css',
-			/* translators: %1$s - template name, %2$s - addon name(s). */
-			'template_addon_prompt'          => esc_html( sprintf( __( 'The %1$s template requires the %2$s. Would you like to install and activate it?', 'wpforms-lite' ), '%template%', '%addons%' ) ),
-			/* translators: %1$s - template name, %2$s - addon name(s). */
-			'template_addons_prompt'         => esc_html( sprintf( __( 'The %1$s template requires the %2$s. Would you like to install and activate all the required addons?', 'wpforms-lite' ), '%template%', '%addons%' ) ),
-			'template_addons_error'          => esc_html__( 'Could not install OR activate all the required addons. Please download from wpforms.com and install them manually. Would you like to use the template anyway?', 'wpforms-lite' ),
-			'use_template'                   => esc_html__( 'Yes, use template', 'wpforms-lite' ),
-			'error_select_template'          => esc_html__( 'Something went wrong while applying the template.', 'wpforms-lite' ),
-			'blank_form'                     => esc_html__( 'Blank Form', 'wpforms-lite' ),
-			'something_went_wrong'           => esc_html__( 'Something went wrong', 'wpforms-lite' ),
-			'field_cannot_be_reordered'      => esc_html__( 'This field cannot be moved.', 'wpforms-lite' ),
-			'empty_label'                    => esc_html__( 'Empty Label', 'wpforms-lite' ),
-			'no_pages_found'                 => esc_html__( 'No results found', 'wpforms-lite' ),
+			'payment_choice_empty_label_tpl'          => sprintf( /* translators: %s - choice number. */
+				esc_html__( 'Item %s', 'wpforms-lite' ),
+				'{number}'
+			),
+			'error_save_form'                         => esc_html__( 'Something went wrong while saving the form. Please reload the page and try again.', 'wpforms-lite' ),
+			'error_contact_support'                   => esc_html__( 'Please contact the plugin support team if this behavior persists.', 'wpforms-lite' ),
+			'error_select_template'                   => esc_html__( 'Something went wrong while applying the form template. Please try again. If the error persists, contact our support team.', 'wpforms-lite' ),
+			'error_load_templates'                    => esc_html__( 'Couldn\'t load the Setup panel.', 'wpforms-lite' ),
+			'blank_form'                              => esc_html__( 'Blank Form', 'wpforms-lite' ),
+			'something_went_wrong'                    => esc_html__( 'Something went wrong', 'wpforms-lite' ),
+			'field_cannot_be_reordered'               => esc_html__( 'This field cannot be moved.', 'wpforms-lite' ),
+			'empty_label'                             => esc_html__( 'Empty Label', 'wpforms-lite' ),
+			'no_pages_found'                          => esc_html__( 'No results found', 'wpforms-lite' ),
+			'number_slider_error_valid_default_value' => sprintf( /* translators: %1$s - from value %2$s - to value. */
+				esc_html__( 'Please enter a valid value or change the Increment. The nearest valid values are %1$s and %2$s.', 'wpforms-lite' ),
+				'{from}',
+				'{to}'
+			),
+			'form_meta'                               => $this->form_data['meta'] ?? [],
+			'scrollbars_css_url'                      => WPFORMS_PLUGIN_URL . 'assets/css/builder/builder-scrollbars.css',
 		];
 
+		$strings = $this->add_localized_currencies( $strings );
+
 		$strings['disable_entries'] = sprintf(
-			wp_kses( /* translators: %s - Link to the WPForms.com doc article. */
+			wp_kses( /* translators: %s - link to the WPForms.com doc article. */
 				__( 'Disabling entry storage for this form will completely prevent any new submissions from getting saved to your site. If you still intend to keep a record of entries through notification emails, then please <a href="%s" target="_blank" rel="noopener noreferrer">test your form</a> to ensure emails send reliably.', 'wpforms-lite' ),
 				[
 					'a' => [
@@ -687,7 +855,7 @@ class WPForms_Builder {
 		);
 
 		$strings['akismet_not_installed'] = sprintf(
-			wp_kses( /* translators: %1$s - Link to the plugin search page, %2$s - Link to the WPForms.com doc article. */
+			wp_kses( /* translators: %1$s - link to the plugin search page, %2$s - link to the WPForms.com doc article. */
 				__( 'This feature cannot be used at this time because the Akismet plugin <a href="%1$s" target="_blank" rel="noopener noreferrer">has not been installed</a>. For information on how to use this feature please <a href="%2$s" target="_blank" rel="noopener noreferrer">refer to our documentation</a>.', 'wpforms-lite' ),
 				[
 					'a' => [
@@ -708,7 +876,7 @@ class WPForms_Builder {
 		);
 
 		$strings['akismet_not_activated'] = sprintf(
-			wp_kses( /* translators: %1$s - Link to the plugins page, %2$s - Link to the WPForms.com doc article. */
+			wp_kses( /* translators: %1$s - link to the plugins page, %2$s - link to the WPForms.com doc article. */
 				__( 'This feature cannot be used at this time because the Akismet plugin <a href="%1$s" target="_blank" rel="noopener noreferrer">has not been activated</a>. For information on how to use this feature please <a href="%2$s" target="_blank" rel="noopener noreferrer">refer to our documentation</a>.', 'wpforms-lite' ),
 				[
 					'a' => [
@@ -729,7 +897,7 @@ class WPForms_Builder {
 		);
 
 		$strings['akismet_no_api_key'] = sprintf(
-			wp_kses( /* translators: %1$s - Link to the Akismet settings page, %2$s - Link to the WPForms.com doc article. */
+			wp_kses( /* translators: %1$s - link to the Akismet settings page, %2$s - link to the WPForms.com doc article. */
 				__( 'This feature cannot be used at this time because the Akismet plugin <a href="%1$s" target="_blank" rel="noopener noreferrer">has not been properly configured</a>. For information on how to use this feature please <a href="%2$s" target="_blank" rel="noopener noreferrer">refer to our documentation</a>.', 'wpforms-lite' ),
 				[
 					'a' => [
@@ -761,28 +929,6 @@ class WPForms_Builder {
 		// phpcs:enable
 
 		return $strings;
-	}
-
-	/**
-	 * Get localized addons.
-	 *
-	 * @since 1.6.8
-	 *
-	 * @return array
-	 */
-	private function get_localized_addons() {
-
-		return wpforms_chain( wpforms()->get( 'addons' )->get_available() )
-			->map(
-				function( $addon ) {
-					return [
-						'title'  => $addon['title'],
-						'action' => $addon['action'],
-						'url'    => $addon['url'],
-					];
-				}
-			)
-			->value();
 	}
 
 	/**
@@ -947,7 +1093,7 @@ class WPForms_Builder {
 			>
 
 				<input type="hidden" name="id" value="<?php echo esc_attr( $form_id ); ?>">
-				<input type="hidden" value="<?php echo absint( $field_id ); ?>" name="field_id" id="wpforms-field-id">
+				<input type="hidden" value="<?php echo wpforms_validate_field_id( $field_id ); ?>" name="field_id" id="wpforms-field-id">
 
 				<?php echo $before_toolbar; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 
@@ -962,10 +1108,19 @@ class WPForms_Builder {
 
 						<?php if ( $this->form ) : ?>
 
-							<?php esc_html_e( 'Now editing', 'wpforms-lite' ); ?>
+							<span class="wpforms-center-form-name-prefix">
+								<?php esc_html_e( 'Now editing', 'wpforms-lite' ); ?>
+							</span>
+
 							<span class="wpforms-center-form-name wpforms-form-name">
 								<?php echo esc_html( isset( $this->form_data['settings']['form_title'] ) ? $this->form_data['settings']['form_title'] : $this->form->post_title ); ?>
 							</span>
+
+							<?php if ( $this->form->post_type === 'wpforms-template' ) : ?>
+								<span class="wpforms-center-form-template-badge">
+									<?php echo esc_html__( 'Template', 'wpforms-lite' ); ?>
+								</span>
+							<?php endif; ?>
 
 						<?php endif; ?>
 
@@ -976,10 +1131,20 @@ class WPForms_Builder {
 						<button id="wpforms-help"
 							class="wpforms-btn wpforms-btn-toolbar wpforms-btn-light-grey"
 							title="<?php esc_attr_e( 'Help Ctrl+H', 'wpforms-lite' ); ?>">
-								<i class="fa fa-question-circle-o"></i><span><?php esc_html_e( 'Help', 'wpforms-lite' ); ?></span>
+								<i class="fa fa-question-circle-o"></i>
+								<span<?php echo $this->form ? ' class="screen-reader-text"' : ''; ?>>
+									<?php esc_html_e( 'Help', 'wpforms-lite' ); ?>
+								</span>
 						</button>
 
 						<?php if ( $this->form ) : ?>
+							<div id="wpforms-context-menu-container"
+								class="wpforms-btn wpforms-btn-toolbar wpforms-btn-light-grey">
+								<svg width="16" height="16" fill="currentColor">
+									<path d="M2 4a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2c0 1.1.9 2 2 2Zm6 12a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2c0 1.1.9 2 2 2Zm-6 0a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2c0 1.1.9 2 2 2Zm0-6a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2c0 1.1.9 2 2 2Zm6 0a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2c0 1.1.9 2 2 2Zm4-8c0 1.1.9 2 2 2a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2ZM8 4a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2c0 1.1.9 2 2 2Zm6 6a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2c0 1.1.9 2 2 2Zm0 6a2 2 0 0 0 2-2 2 2 0 0 0-2-2 2 2 0 0 0-2 2c0 1.1.9 2 2 2Z"/>
+								</svg>
+								<?php echo wpforms_render( 'builder/context-menu', $this->get_context_menu_args(), true ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+							</div>
 
 							<?php if ( ! $revision ) : ?>
 								<a href="<?php echo esc_url( $preview_url ); ?>"
@@ -993,11 +1158,19 @@ class WPForms_Builder {
 							<?php endif; ?>
 
 							<?php if ( $can_embed && ! $revision ) : ?>
-								<button id="wpforms-embed"
-									class="wpforms-btn wpforms-btn-toolbar wpforms-btn-light-grey"
-									title="<?php esc_attr_e( 'Embed Form Ctrl+B', 'wpforms-lite' ); ?>">
+								<?php if ( $this->form->post_type === 'wpforms-template' ) : ?>
+									<button id="wpforms-embed"
+											class="wpforms-btn wpforms-btn-toolbar wpforms-btn-light-grey wpforms-btn-light-grey-disabled"
+											title="<?php esc_attr_e( 'You cannot embed a form template', 'wpforms-lite' ); ?>">
 										<i class="fa fa-code"></i><span class="text"><?php esc_html_e( 'Embed', 'wpforms-lite' ); ?></span>
-								</button>
+									</button>
+								<?php else : ?>
+									<button id="wpforms-embed"
+											class="wpforms-btn wpforms-btn-toolbar wpforms-btn-light-grey"
+											title="<?php esc_attr_e( 'Embed Form Ctrl+B', 'wpforms-lite' ); ?>">
+										<i class="fa fa-code"></i><span class="text"><?php esc_html_e( 'Embed', 'wpforms-lite' ); ?></span>
+									</button>
+								<?php endif; ?>
 							<?php endif; ?>
 
 							<button id="wpforms-save"
@@ -1095,6 +1268,75 @@ class WPForms_Builder {
 		}
 
 		return $value;
+	}
+
+	/**
+	 * Get localized currency strings for the builder.
+	 *
+	 * @since 1.8.2
+	 *
+	 * @param array $strings Array of localized strings.
+	 *
+	 * @return array
+	 */
+	private function add_localized_currencies( array $strings ) {
+
+		$currency   = wpforms_get_currency();
+		$currencies = wpforms_get_currencies();
+
+		$strings['currency']            = sanitize_text_field( $currency );
+		$strings['currency_name']       = isset( $currencies[ $currency ]['name'] ) ? sanitize_text_field( $currencies[ $currency ]['name'] ) : '';
+		$strings['currency_decimals']   = wpforms_get_currency_decimals( $currencies[ $currency ] );
+		$strings['currency_decimal']    = isset( $currencies[ $currency ]['decimal_separator'] ) ? sanitize_text_field( $currencies[ $currency ]['decimal_separator'] ) : '.';
+		$strings['currency_thousands']  = isset( $currencies[ $currency ]['thousands_separator'] ) ? sanitize_text_field( $currencies[ $currency ]['thousands_separator'] ) : ',';
+		$strings['currency_symbol']     = isset( $currencies[ $currency ]['symbol'] ) ? sanitize_text_field( $currencies[ $currency ]['symbol'] ) : '$';
+		$strings['currency_symbol_pos'] = isset( $currencies[ $currency ]['symbol_pos'] ) ? sanitize_text_field( $currencies[ $currency ]['symbol_pos'] ) : 'left';
+
+		return $strings;
+	}
+
+	/**
+	 * Get context menu arguments, depending on the Lite/Pro version and form or form template type.
+	 *
+	 * @since 1.8.8
+	 *
+	 * @return array
+	 */
+	private function get_context_menu_args(): array {
+
+		$args = [
+			'form_id'          => $this->form->ID,
+			'is_form_template' => $this->form->post_type === 'wpforms-template',
+			'has_payments'     => wpforms()->get( 'payment' )->get_by( 'form_id', $this->form->ID ) !== null,
+			'show_whats_new'   => wpforms()->get( 'splash_screen' )->is_available_for_display(),
+		];
+
+		if ( wpforms()->is_pro() ) {
+			$args['has_entries']   = wpforms()->get( 'entry' )->get_entries( [ 'form_id' => $this->form->ID ], true ) > 0;
+			$args['can_duplicate'] = $this->can_duplicate();
+		}
+
+		return $args;
+	}
+
+	/**
+	 * Check if the current user is allowed to duplicate the form.
+	 *
+	 * @since 1.8.8
+	 *
+	 * @return bool
+	 */
+	private function can_duplicate(): bool {
+
+		if ( ! wpforms_current_user_can( 'create_forms' ) ) {
+			return false;
+		}
+
+		if ( ! wpforms_current_user_can( 'view_form_single', $this->form->ID ) ) {
+			return false;
+		}
+
+		return true;
 	}
 }
 

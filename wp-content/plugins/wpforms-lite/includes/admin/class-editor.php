@@ -1,5 +1,9 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Functionality related to the admin TinyMCE editor.
  *
@@ -41,9 +45,8 @@ class WPForms_Admin_Editor {
 		$icon = '<span class="wp-media-buttons-icon wpforms-menu-icon" style="font-size:16px;margin-top:-2px;"><svg width="18" height="18" viewBox="0 0 1792 1792" xmlns="http://www.w3.org/2000/svg"><path d="M643 911v128h-252v-128h252zm0-255v127h-252v-127h252zm758 511v128h-341v-128h341zm0-256v128h-672v-128h672zm0-255v127h-672v-127h672zm135 860v-1240q0-8-6-14t-14-6h-32l-378 256-210-171-210 171-378-256h-32q-8 0-14 6t-6 14v1240q0 8 6 14t14 6h1240q8 0 14-6t6-14zm-855-1110l185-150h-406zm430 0l221-150h-406zm553-130v1240q0 62-43 105t-105 43h-1240q-62 0-105-43t-43-105v-1240q0-62 43-105t105-43h1240q62 0 105 43t43 105z" fill="#82878c"/></svg></span>';
 
 		printf(
-			'<a href="#" class="button wpforms-insert-form-button" data-editor="%s" title="%s">%s %s</a>',
+			'<button type="button" class="button wpforms-insert-form-button" data-editor="%s">%s %s</button>',
 			esc_attr( $editor_id ),
-			esc_attr__( 'Add Form', 'wpforms-lite' ),
 			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 			$icon,
 			esc_html__( 'Add Form', 'wpforms-lite' )
@@ -54,7 +57,7 @@ class WPForms_Admin_Editor {
 		// If we have made it this far then load the JS.
 		wp_enqueue_script(
 			'wpforms-editor',
-			WPFORMS_PLUGIN_URL . "assets/js/admin-editor{$min}.js",
+			WPFORMS_PLUGIN_URL . "assets/js/admin/admin-editor{$min}.js",
 			[ 'jquery' ],
 			WPFORMS_VERSION,
 			true
@@ -112,19 +115,20 @@ class WPForms_Admin_Editor {
 						printf(
 							wp_kses( /* translators: %s - WPForms documentation URL. */
 								__( 'Heads up! Don\'t forget to test your form. <a href="%s" target="_blank" rel="noopener noreferrer">Check out our complete guide</a>!', 'wpforms-lite' ),
-								array(
-									'a' => array(
-										'href'   => array(),
-										'rel'    => array(),
-										'target' => array(),
-									),
-								)
+								[
+									'a' => [
+										'href'   => [],
+										'rel'    => [],
+										'target' => [],
+									],
+								]
 							),
 							'https://wpforms.com/docs/how-to-properly-test-your-wordpress-forms-before-launching-checklist/'
 						);
 						echo '</p>';
-						$args  = apply_filters( 'wpforms_modal_select', array() );
-						$forms = wpforms()->form->get( '', $args );
+						$args  = apply_filters( 'wpforms_modal_select', [] );
+						$forms = wpforms()->get( 'form' )->get( '', $args );
+
 						if ( ! empty( $forms ) ) {
 							printf( '<p><label for="wpforms-modal-select-form">%s</label></p>', esc_html__( 'Select a form below to insert', 'wpforms-lite' ) );
 							echo '<select id="wpforms-modal-select-form">';
@@ -140,11 +144,11 @@ class WPForms_Admin_Editor {
 								wp_kses(
 									/* translators: %s - WPForms Builder page. */
 									__( 'Whoops, you haven\'t created a form yet. Want to <a href="%s">give it a go</a>?', 'wpforms-lite' ),
-									array(
-										'a' => array(
-											'href' => array(),
-										),
-									)
+									[
+										'a' => [
+											'href' => [],
+										],
+									]
 								),
 								admin_url( 'admin.php?page=wpforms-builder' )
 							);

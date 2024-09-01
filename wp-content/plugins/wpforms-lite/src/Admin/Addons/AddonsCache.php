@@ -2,12 +2,23 @@
 
 namespace WPForms\Admin\Addons;
 
+use WPForms\Helpers\CacheBase;
+
 /**
  * Addons cache handler.
  *
  * @since 1.6.6
  */
-class AddonsCache extends \WPForms\Helpers\CacheBase {
+class AddonsCache extends CacheBase {
+
+	/**
+	 * Remote source URL.
+	 *
+	 * @since 1.8.9
+	 *
+	 * @var string
+	 */
+	const REMOTE_SOURCE = 'https://wpforms.com/wp-content/addons.json';
 
 	/**
 	 * Determine if the class is allowed to load.
@@ -18,8 +29,14 @@ class AddonsCache extends \WPForms\Helpers\CacheBase {
 	 */
 	protected function allow_load() {
 
-		// Load only in the Admin area or Form Builder.
-		return wp_doing_ajax() || wpforms_is_admin_page() || wpforms_is_admin_page( 'builder' );
+		if ( wp_doing_cron() || wpforms_doing_wp_cli() ) {
+			return true;
+		}
+
+		$has_permissions  = wpforms_current_user_can( [ 'create_forms', 'edit_forms' ] );
+		$allowed_requests = wpforms_is_admin_ajax() || wpforms_is_admin_page() || wpforms_is_admin_page( 'builder' );
+
+		return $has_permissions && $allowed_requests;
 	}
 
 	/**
@@ -34,7 +51,7 @@ class AddonsCache extends \WPForms\Helpers\CacheBase {
 		return [
 
 			// Remote source URL.
-			'remote_source' => 'https://wpforms.com/wp-content/addons.json',
+			'remote_source' => $this->get_remote_source(),
 
 			// Addons cache file name.
 			'cache_file'    => 'addons.json',
@@ -57,6 +74,18 @@ class AddonsCache extends \WPForms\Helpers\CacheBase {
 	}
 
 	/**
+	 * Get remote source URL.
+	 *
+	 * @since 1.8.9
+	 *
+	 * @return string
+	 */
+	protected function get_remote_source(): string {
+
+		return defined( 'WPFORMS_ADDONS_REMOTE_SOURCE' ) ? WPFORMS_ADDONS_REMOTE_SOURCE : self::REMOTE_SOURCE;
+	}
+
+	/**
 	 * Prepare addons data to store in a local cache -
 	 * generate addons icon image file name for further use.
 	 *
@@ -66,7 +95,7 @@ class AddonsCache extends \WPForms\Helpers\CacheBase {
 	 *
 	 * @return array Prepared data for caching (with icons).
 	 */
-	protected function prepare_cache_data( $data ) {
+	protected function prepare_cache_data( $data ): array {
 
 		if ( empty( $data ) || ! is_array( $data ) ) {
 			return [];
@@ -78,6 +107,11 @@ class AddonsCache extends \WPForms\Helpers\CacheBase {
 
 			// Addon icon.
 			$addon['icon'] = str_replace( 'wpforms-', 'addon-icon-', $addon['slug'] ) . '.png';
+
+			// Special case for Sendinblue addon. The service was renamed to Brevo, but we keep the old slug for compatibility.
+			if ( $addon['slug'] === 'wpforms-sendinblue' ) {
+				$addon['icon'] = str_replace( 'sendinblue', 'brevo', $addon['icon'] );
+			}
 
 			// Use slug as a key for further usage.
 			$addons_cache[ $addon['slug'] ] = $addon;

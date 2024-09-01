@@ -1,5 +1,7 @@
 <?php
 
+use WPForms\Vendor\TrueBV\Punycode;
+
 /**
  * Email text field.
  *
@@ -29,6 +31,15 @@ class WPForms_Field_Email extends WPForms_Field {
 	const RULES = 'rules';
 
 	/**
+	 * Restricted rules.
+	 *
+	 * @since 1.8.9
+	 *
+	 * @var array
+	 */
+	private $restricted_rules = [];
+
+	/**
 	 * Primary class constructor.
 	 *
 	 * @since 1.0.0
@@ -36,19 +47,30 @@ class WPForms_Field_Email extends WPForms_Field {
 	public function init() {
 
 		// Define field type information.
-		$this->name  = esc_html__( 'Email', 'wpforms-lite' );
-		$this->type  = 'email';
-		$this->icon  = 'fa-envelope-o';
-		$this->order = 170;
+		$this->name     = esc_html__( 'Email', 'wpforms-lite' );
+		$this->keywords = esc_html__( 'user', 'wpforms-lite' );
+		$this->type     = 'email';
+		$this->icon     = 'fa-envelope-o';
+		$this->order    = 170;
+
+		$this->hooks();
+	}
+
+	/**
+	 * Hooks.
+	 *
+	 * @since 1.8.1
+	 */
+	private function hooks() {
 
 		// Define additional field properties.
-		add_filter( 'wpforms_field_properties_email', array( $this, 'field_properties' ), 5, 3 );
+		add_filter( 'wpforms_field_properties_email', [ $this, 'field_properties' ], 5, 3 );
 
 		// Set field to default to required.
-		add_filter( 'wpforms_field_new_required', array( $this, 'default_required' ), 10, 2 );
+		add_filter( 'wpforms_field_new_required', [ $this, 'default_required' ], 10, 2 );
 
 		// Set confirmation status to option wrapper class.
-		add_filter( 'wpforms_builder_field_option_class', array( $this, 'field_option_class' ), 10, 2 );
+		add_filter( 'wpforms_builder_field_option_class', [ $this, 'field_option_class' ], 10, 2 );
 
 		add_action( 'wp_ajax_wpforms_restricted_email', [ $this, 'ajax_check_restricted_email' ] );
 		add_action( 'wp_ajax_nopriv_wpforms_restricted_email', [ $this, 'ajax_check_restricted_email' ] );
@@ -59,6 +81,9 @@ class WPForms_Field_Email extends WPForms_Field {
 		add_filter( 'wpforms_save_form_args', [ $this, 'save_form_args' ], 11, 3 );
 
 		add_filter( 'wpforms_builder_strings', [ $this, 'add_builder_strings' ], 10, 2 );
+
+		// This field requires fieldset+legend instead of the field label.
+		add_filter( "wpforms_frontend_modern_is_field_requires_fieldset_{$this->type}", [ $this, 'is_field_requires_fieldset' ], PHP_INT_MAX, 2 );
 	}
 
 	/**
@@ -73,6 +98,9 @@ class WPForms_Field_Email extends WPForms_Field {
 	 * @return array
 	 */
 	public function field_properties( $properties, $field, $form_data ) {
+
+		// Prevent "spell-jacking" of email addresses.
+		$properties['inputs']['primary']['attr']['spellcheck'] = 'false';
 
 		if ( ! empty( $field['confirmation'] ) ) {
 			$properties = $this->confirmation_field_properties( $properties, $field, $form_data );
@@ -97,51 +125,52 @@ class WPForms_Field_Email extends WPForms_Field {
 	 */
 	public function confirmation_field_properties( $properties, $field, $form_data ) {
 		$form_id  = absint( $form_data['id'] );
-		$field_id = absint( $field['id'] );
+		$field_id = wpforms_validate_field_id( $field['id'] );
 
 		// Email confirmation setting enabled.
-		$props = array(
-			'inputs' => array(
-				'primary'   => array(
-					'block'    => array(
+		$props = [
+			'inputs' => [
+				'primary'   => [
+					'block'    => [
 						'wpforms-field-row-block',
 						'wpforms-one-half',
 						'wpforms-first',
-					),
-					'class'    => array(
+					],
+					'class'    => [
 						'wpforms-field-email-primary',
-					),
-					'sublabel' => array(
+					],
+					'sublabel' => [
 						'hidden' => ! empty( $field['sublabel_hide'] ),
 						'value'  => esc_html__( 'Email', 'wpforms-lite' ),
-					),
-				),
-				'secondary' => array(
-					'attr'     => array(
+					],
+				],
+				'secondary' => [
+					'attr'     => [
 						'name'        => "wpforms[fields][{$field_id}][secondary]",
 						'value'       => '',
 						'placeholder' => ! empty( $field['confirmation_placeholder'] ) ? $field['confirmation_placeholder'] : '',
-					),
-					'block'    => array(
+						'spellcheck'  => 'false',
+					],
+					'block'    => [
 						'wpforms-field-row-block',
 						'wpforms-one-half',
-					),
-					'class'    => array(
+					],
+					'class'    => [
 						'wpforms-field-email-secondary',
-					),
-					'data'     => array(
+					],
+					'data'     => [
 						'rule-confirm' => '#' . $properties['inputs']['primary']['id'],
-					),
+					],
 					'id'       => "wpforms-{$form_id}-field_{$field_id}-secondary",
 					'required' => ! empty( $field['required'] ) ? 'required' : '',
-					'sublabel' => array(
+					'sublabel' => [
 						'hidden' => ! empty( $field['sublabel_hide'] ),
 						'value'  => esc_html__( 'Confirm Email', 'wpforms-lite' ),
-					),
+					],
 					'value'    => '',
-				),
-			),
-		);
+				],
+			],
+		];
 
 		$properties = array_merge_recursive( $properties, $props );
 
@@ -151,10 +180,10 @@ class WPForms_Field_Email extends WPForms_Field {
 		// Input Primary: remove size and error classes.
 		$properties['inputs']['primary']['class'] = array_diff(
 			$properties['inputs']['primary']['class'],
-			array(
+			[
 				'wpforms-field-' . sanitize_html_class( $field['size'] ),
 				'wpforms-error',
-			)
+			]
 		);
 
 		// Input Primary: add error class if needed.
@@ -249,9 +278,10 @@ class WPForms_Field_Email extends WPForms_Field {
 		 */
 
 		// Options open markup.
-		$args = array(
+		$args = [
 			'markup' => 'open',
-		);
+		];
+
 		$this->field_option( 'basic-options', $field, $args );
 
 		// Label.
@@ -267,24 +297,27 @@ class WPForms_Field_Email extends WPForms_Field {
 		$fld = $this->field_element(
 			'toggle',
 			$field,
-			array(
+			[
 				'slug'    => 'confirmation',
 				'value'   => isset( $field['confirmation'] ) ? '1' : '0',
 				'desc'    => esc_html__( 'Enable Email Confirmation', 'wpforms-lite' ),
 				'tooltip' => esc_html__( 'Check this option to ask users to provide an email address twice.', 'wpforms-lite' ),
-			),
+			],
 			false
 		);
-		$args = array(
+
+		$args = [
 			'slug'    => 'confirmation',
 			'content' => $fld,
-		);
+		];
+
 		$this->field_element( 'row', $field, $args );
 
 		// Options close markup.
-		$args = array(
+		$args = [
 			'markup' => 'close',
-		);
+		];
+
 		$this->field_option( 'basic-options', $field, $args );
 
 		/*
@@ -292,9 +325,10 @@ class WPForms_Field_Email extends WPForms_Field {
 		 */
 
 		// Options open markup.
-		$args = array(
+		$args = [
 			'markup' => 'open',
-		);
+		];
+
 		$this->field_option( 'advanced-options', $field, $args );
 
 		// Size.
@@ -307,26 +341,29 @@ class WPForms_Field_Email extends WPForms_Field {
 		$lbl = $this->field_element(
 			'label',
 			$field,
-			array(
+			[
 				'slug'    => 'confirmation_placeholder',
 				'value'   => esc_html__( 'Confirmation Placeholder Text', 'wpforms-lite' ),
 				'tooltip' => esc_html__( 'Enter text for the confirmation field placeholder.', 'wpforms-lite' ),
-			),
+			],
 			false
 		);
-		$fld  = $this->field_element(
+
+		$fld = $this->field_element(
 			'text',
 			$field,
-			array(
+			[
 				'slug'  => 'confirmation_placeholder',
 				'value' => ! empty( $field['confirmation_placeholder'] ) ? esc_attr( $field['confirmation_placeholder'] ) : '',
-			),
+			],
 			false
 		);
-		$args = array(
+
+		$args = [
 			'slug'    => 'confirmation_placeholder',
 			'content' => $lbl . $fld,
-		);
+		];
+
 		$this->field_element( 'row', $field, $args );
 
 		// Default value.
@@ -543,12 +580,12 @@ class WPForms_Field_Email extends WPForms_Field {
 		$name = ! empty( $form_data['fields'][ $field_id ] ['label'] ) ? $form_data['fields'][ $field_id ]['label'] : '';
 
 		// Set final field details.
-		wpforms()->process->fields[ $field_id ] = array(
+		wpforms()->get( 'process' )->fields[ $field_id ] = [
 			'name'  => sanitize_text_field( $name ),
 			'value' => sanitize_text_field( $this->decode_punycode( $value ) ),
-			'id'    => absint( $field_id ),
+			'id'    => wpforms_validate_field_id( $field_id ),
 			'type'  => $this->type,
-		);
+		];
 	}
 
 	/**
@@ -557,7 +594,7 @@ class WPForms_Field_Email extends WPForms_Field {
 	 * @since 1.0.0
 	 *
 	 * @param int   $field_id     Field ID.
-	 * @param mixed $field_submit Field value that was submitted.
+	 * @param mixed $field_submit Submitted field value (raw data).
 	 * @param array $form_data    Form data and settings.
 	 */
 	public function validate( $field_id, $field_submit, $form_data ) { // phpcs:ignore Generic.Metrics.CyclomaticComplexity.TooHigh
@@ -628,13 +665,17 @@ class WPForms_Field_Email extends WPForms_Field {
 
 		$form_id  = filter_input( INPUT_POST, 'form_id', FILTER_SANITIZE_NUMBER_INT );
 		$field_id = filter_input( INPUT_POST, 'field_id', FILTER_SANITIZE_NUMBER_INT );
-		$email    = filter_input( INPUT_POST, 'email', FILTER_SANITIZE_FULL_SPECIAL_CHARS );
+		$email    = filter_input( INPUT_POST, 'email', FILTER_SANITIZE_FULL_SPECIAL_CHARS, FILTER_FLAG_NO_ENCODE_QUOTES );
+
+		// The valid email can contain such characters: !#$%&'*+/=?^_`{|}~-.
+		// After filtering the email, we need to decode the `&amp;`, otherwise the email with `&` couldn't be properly recognized.
+		$email = str_replace( '&amp;', '&', $email );
 
 		if ( ! $form_id || ! $field_id || ! $email ) {
 			wp_send_json_error();
 		}
 
-		$form_data = wpforms()->form->get(
+		$form_data = wpforms()->get( 'form' )->get(
 			$form_id,
 			[ 'content_only' => true ]
 		);
@@ -677,7 +718,7 @@ class WPForms_Field_Email extends WPForms_Field {
 	 *
 	 * @return void
 	 */
-	private function ajax_sanitize( $type ) {
+	private function ajax_sanitize( $type ) { // phpcs:ignore Generic.Metrics.CyclomaticComplexity.TooHigh
 
 		// Run a security check.
 		check_ajax_referer( 'wpforms-builder', 'nonce' );
@@ -688,6 +729,8 @@ class WPForms_Field_Email extends WPForms_Field {
 		if ( ! $content ) {
 			wp_send_json_error();
 		}
+
+		$this->restricted_rules = [];
 
 		switch ( $type ) {
 			case self::RULES:
@@ -718,6 +761,10 @@ class WPForms_Field_Email extends WPForms_Field {
 
 			default:
 				break;
+		}
+
+		if ( ! empty( $this->restricted_rules ) ) {
+			$content['restricted'] = count( $this->restricted_rules );
 		}
 
 		wp_send_json_success( $content );
@@ -906,6 +953,8 @@ class WPForms_Field_Email extends WPForms_Field {
 
 			if ( ! $email_pattern ) {
 				unset( $patterns[ $key ] );
+				$this->restricted_rules[] = $pattern;
+
 				continue;
 			}
 
@@ -969,8 +1018,11 @@ class WPForms_Field_Email extends WPForms_Field {
 	 */
 	private function sanitize_email_pattern( $pattern ) {
 
+		$chars   = [ '.', '*', '/' ];
+		$replace = [ '\.', '.*', '\/' ];
+
 		// Create regex pattern from a string.
-		return '^' . str_replace( [ '.', '*' ], [ '\.', '.*' ], $pattern ) . '$';
+		return '^' . str_replace( $chars, $replace, $pattern ) . '$';
 	}
 
 	/**
@@ -1018,12 +1070,22 @@ class WPForms_Field_Email extends WPForms_Field {
 	 */
 	public function add_builder_strings( $strings, $form ) {
 
-		$strings['allow_deny_lists_intersect'] = esc_html__(
-			'We’ve detected the same text in your allowlist and denylist. To prevent a conflict, we’ve removed the following text from the list you’re currently viewing:',
-			'wpforms-lite'
-		);
+		$email_strings = [
+			'allow_deny_lists_intersect' => esc_html__(
+				'We’ve detected the same text in your allowlist and denylist. To prevent a conflict, we’ve removed the following text from the list you’re currently viewing:',
+				'wpforms-lite'
+			),
+			'restricted_rules'           => esc_html__(
+				'At least one of the emails in your list contained an error and has been removed.',
+				'wpforms-lite'
+			),
+			'restricted_default_email'   => esc_html__(
+				'The provided email is not valid.',
+				'wpforms-lite'
+			),
+		];
 
-		return $strings;
+		return array_merge( $strings, $email_strings );
 	}
 
 	/**
@@ -1031,14 +1093,14 @@ class WPForms_Field_Email extends WPForms_Field {
 	 *
 	 * @since 1.6.9
 	 *
-	 * @return \TrueBV\Punycode
+	 * @return WPForms\Vendor\TrueBV\Punycode
 	 */
 	private function get_punycode() {
 
 		static $punycode;
 
 		if ( ! $punycode ) {
-			$punycode = new \TrueBV\Punycode();
+			$punycode = new Punycode();
 		}
 
 		return $punycode;
@@ -1277,5 +1339,22 @@ class WPForms_Field_Email extends WPForms_Field {
 		}
 
 		return false;
+	}
+
+	/**
+	 * Determine if the field requires fieldset instead of the regular field label.
+	 *
+	 * @since 1.8.1
+	 *
+	 * @param bool  $requires_fieldset True if requires fieldset.
+	 * @param array $field             Field data.
+	 *
+	 * @return bool
+	 *
+	 * @noinspection PhpUnusedParameterInspection
+	 */
+	public function is_field_requires_fieldset( $requires_fieldset, $field ) {
+
+		return ! empty( $field['confirmation'] );
 	}
 }

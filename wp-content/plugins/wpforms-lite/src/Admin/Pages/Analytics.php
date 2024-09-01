@@ -25,7 +25,7 @@ class Analytics {
 	 *
 	 * @var array
 	 */
-	private $config = array(
+	private $config = [
 		'lite_plugin'         => 'google-analytics-for-wordpress/googleanalytics.php',
 		'lite_wporg_url'      => 'https://wordpress.org/plugins/google-analytics-for-wordpress/',
 		'lite_download_url'   => 'https://downloads.wordpress.org/plugin/google-analytics-for-wordpress.zip',
@@ -35,7 +35,7 @@ class Analytics {
 		'mi_onboarding'       => 'admin.php?page=monsterinsights-onboarding',
 		'mi_addons'           => 'admin.php?page=monsterinsights_settings#/addons',
 		'mi_forms'            => 'admin.php?page=monsterinsights_reports#/forms',
-	);
+	];
 
 	/**
 	 * Runtime data used for generating page HTML.
@@ -44,7 +44,7 @@ class Analytics {
 	 *
 	 * @var array
 	 */
-	private $output_data = array();
+	private $output_data = [];
 
 	/**
 	 * Constructor.
@@ -53,7 +53,7 @@ class Analytics {
 	 */
 	public function __construct() {
 
-		if ( ! \wpforms_current_user_can() ) {
+		if ( ! wpforms_current_user_can() ) {
 			return;
 		}
 
@@ -68,21 +68,22 @@ class Analytics {
 	public function hooks() {
 
 		if ( wp_doing_ajax() ) {
-			add_action( 'wp_ajax_wpforms_analytics_page_check_plugin_status', array( $this, 'ajax_check_plugin_status' ) );
+			add_action( 'wp_ajax_wpforms_analytics_page_check_plugin_status', [ $this, 'ajax_check_plugin_status' ] );
 		}
 
 		// Check what page we are on.
-		$page = isset( $_GET['page'] ) ? \sanitize_key( \wp_unslash( $_GET['page'] ) ) : ''; // phpcs:ignore WordPress.CSRF.NonceVerification
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
 
 		// Only load if we are actually on the Analytics page.
-		if ( self::SLUG !== $page ) {
+		if ( $page !== self::SLUG ) {
 			return;
 		}
 
-		add_action( 'admin_init', array( $this, 'redirect_to_mi_forms' ) );
+		add_action( 'admin_init', [ $this, 'redirect_to_mi_forms' ] );
 		add_filter( 'wpforms_admin_header', '__return_false' );
-		add_action( 'wpforms_admin_page', array( $this, 'output' ) );
-		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
+		add_action( 'wpforms_admin_page', [ $this, 'output' ] );
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 
 		// Hook for addons.
 		do_action( 'wpforms_admin_pages_analytics_hooks' );
@@ -95,7 +96,7 @@ class Analytics {
 	 */
 	public function enqueue_assets() {
 
-		$min = \wpforms_get_min_suffix();
+		$min = wpforms_get_min_suffix();
 
 		// Lity.
 		wp_enqueue_style(
@@ -108,20 +109,20 @@ class Analytics {
 		wp_enqueue_script(
 			'wpforms-lity',
 			WPFORMS_PLUGIN_URL . 'assets/lib/lity/lity.min.js',
-			array( 'jquery' ),
+			[ 'jquery' ],
 			'3.0.0',
 			true
 		);
 
 		wp_enqueue_script(
 			'wpforms-admin-page-analytics',
-			WPFORMS_PLUGIN_URL . "assets/js/components/admin/pages/mi-analytics{$min}.js",
-			array( 'jquery' ),
+			WPFORMS_PLUGIN_URL . "assets/js/admin/pages/mi-analytics{$min}.js",
+			[ 'jquery' ],
 			WPFORMS_VERSION,
 			true
 		);
 
-		\wp_localize_script(
+		wp_localize_script(
 			'wpforms-admin-page-analytics',
 			'wpforms_pluginlanding',
 			$this->get_js_strings()
@@ -235,7 +236,7 @@ class Analytics {
 					<li>%5$s</li>
 					<li>%6$s</li>
 					<li>%7$s</li>
-				</ul>			
+				</ul>
 			</section>',
 			esc_url( WPFORMS_PLUGIN_URL . 'assets/images/analytics/screenshot-tnail.jpg' ),
 			esc_attr__( 'Analytics screenshot', 'wpforms-lite' ),
@@ -334,7 +335,7 @@ class Analytics {
 					<h2>%4$s</h2>
 					<p>%5$s</p>
 					<button class="button %6$s" data-url="%7$s">%8$s</button>
-				</div>		
+				</div>
 			</section>',
 			esc_attr( $step['section_class'] ),
 			esc_url( WPFORMS_PLUGIN_URL . 'assets/images/' . $step['icon'] ),
@@ -370,7 +371,7 @@ class Analytics {
 					<h2>%4$s</h2>
 					<p>%5$s</p>
 					<button class="button %6$s" data-url="%7$s">%8$s</button>
-				</div>		
+				</div>
 			</section>',
 			esc_attr( $step['section_class'] ),
 			esc_url( WPFORMS_PLUGIN_URL . 'assets/images/step-3.svg' ),
@@ -392,7 +393,7 @@ class Analytics {
 	 */
 	protected function get_data_step_install() {
 
-		$step                = array();
+		$step                = [];
 		$step['heading']     = esc_html__( 'Install & Activate MonsterInsights', 'wpforms-lite' );
 		$step['description'] = esc_html__( 'Track form impressions and conversions.', 'wpforms-lite' );
 
@@ -433,14 +434,16 @@ class Analytics {
 	 * @since 1.5.7
 	 *
 	 * @return array Step data.
+	 * @noinspection PhpUndefinedFunctionInspection
 	 */
 	protected function get_data_step_setup() {
 
-		$step = array();
+		$step = [];
 
 		$this->output_data['plugin_setup'] = false;
+
 		if ( $this->output_data['plugin_activated'] ) {
-			$this->output_data['plugin_setup'] = '' !== (string) \monsterinsights_get_ua();
+			$this->output_data['plugin_setup'] = function_exists( 'monsterinsights_get_ua' ) && '' !== (string) monsterinsights_get_ua();
 		}
 
 		$step['icon']          = 'step-2.svg';
@@ -465,10 +468,11 @@ class Analytics {
 	 * @since 1.5.7
 	 *
 	 * @return array Step data.
+	 * @noinspection PhpUndefinedFunctionInspection
 	 */
 	protected function get_data_step_addon() {
 
-		$step = array();
+		$step = [];
 
 		$step['icon']          = 'step-3.svg';
 		$step['section_class'] = $this->output_data['plugin_setup'] ? '' : 'grey';
@@ -477,10 +481,12 @@ class Analytics {
 		$step['button_url']    = '';
 
 		$plugin_license_level = false;
+
 		if ( $this->output_data['plugin_activated'] ) {
-			$mi = \MonsterInsights();
+			$mi = MonsterInsights();
 
 			$plugin_license_level = 'lite';
+
 			if ( is_object( $mi->license ) && method_exists( $mi->license, 'license_can' ) ) {
 				$plugin_license_level = $mi->license->license_can( 'plus' ) ? 'lite' : $plugin_license_level;
 				$plugin_license_level = $mi->license->license_can( 'pro' ) || $mi->license->license_can( 'agency' ) ? 'pro' : $plugin_license_level;
@@ -509,6 +515,8 @@ class Analytics {
 	 * Used to properly init step 2 section after completing step 1.
 	 *
 	 * @since 1.5.7
+	 *
+	 * @noinspection PhpUndefinedFunctionInspection
 	 */
 	public function ajax_check_plugin_status() {
 
@@ -518,28 +526,29 @@ class Analytics {
 			! wpforms_current_user_can()
 		) {
 			wp_send_json_error(
-				array(
+				[
 					'error' => esc_html__( 'You do not have permission.', 'wpforms-lite' ),
-				)
+				]
 			);
 		}
 
-		$result = array();
+		$result = [];
 
 		if ( ! function_exists( 'MonsterInsights' ) || ! function_exists( 'monsterinsights_get_ua' ) ) {
 			wp_send_json_error(
-				array(
+				[
 					'error' => esc_html__( 'Plugin unavailable.', 'wpforms-lite' ),
-				)
+				]
 			);
 		}
 
-		$result['setup_status'] = (int) ( '' !== (string) \monsterinsights_get_ua() );
+		$result['setup_status'] = (int) ( '' !== (string) monsterinsights_get_ua() );
 
-		$mi = \MonsterInsights();
+		$mi = MonsterInsights();
 
 		$result['license_level']    = 'lite';
 		$result['step3_button_url'] = $this->config['mi_forms_addon_page'];
+
 		if ( is_object( $mi->license ) && method_exists( $mi->license, 'license_can' ) ) {
 			$result['license_level']    = $mi->license->license_can( 'pro' ) || $mi->license->license_can( 'agency' ) ? 'pro' : $result['license_level'];
 			$result['step3_button_url'] = admin_url( $this->config['mi_addons'] );

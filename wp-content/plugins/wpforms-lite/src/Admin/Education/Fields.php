@@ -81,18 +81,18 @@ class Fields {
 				'order'   => '130',
 			],
 			[
-				'icon'    => 'fa-pencil-square-o',
-				'name'    => esc_html__( 'Rich Text', 'wpforms-lite' ),
-				'name_en' => 'Rich Text',
-				'type'    => 'richtext',
-				'group'   => 'fancy',
-				'order'   => '140',
-			],
-			[
 				'icon'    => 'fa-columns',
 				'name'    => esc_html__( 'Layout', 'wpforms-lite' ),
 				'name_en' => 'Layout',
 				'type'    => 'layout',
+				'group'   => 'fancy',
+				'order'   => '140',
+			],
+			[
+				'icon'    => 'fa-list',
+				'name'    => esc_html__( 'Repeater', 'wpforms-lite' ),
+				'name_en' => 'Repeater',
+				'type'    => 'repeater',
 				'group'   => 'fancy',
 				'order'   => '150',
 			],
@@ -113,12 +113,12 @@ class Fields {
 				'order'   => '170',
 			],
 			[
-				'icon'    => 'fa-code',
-				'name'    => esc_html__( 'HTML', 'wpforms-lite' ),
-				'name_en' => 'HTML',
-				'type'    => 'html',
+				'icon'    => 'fa-pencil-square-o',
+				'name'    => esc_html__( 'Rich Text', 'wpforms-lite' ),
+				'name_en' => 'Rich Text',
+				'type'    => 'richtext',
 				'group'   => 'fancy',
-				'order'   => '180',
+				'order'   => '170',
 			],
 			[
 				'icon'    => 'fa-file-image-o',
@@ -126,7 +126,15 @@ class Fields {
 				'name_en' => 'Content',
 				'type'    => 'content',
 				'group'   => 'fancy',
-				'order'   => '181',
+				'order'   => '180',
+			],
+			[
+				'icon'    => 'fa-code',
+				'name'    => esc_html__( 'HTML', 'wpforms-lite' ),
+				'name_en' => 'HTML',
+				'type'    => 'html',
+				'group'   => 'fancy',
+				'order'   => '185',
 			],
 			[
 				'icon'    => 'fa-file-text-o',
@@ -153,116 +161,84 @@ class Fields {
 				'order'   => '210',
 			],
 			[
-				'icon'    => 'fa-question-circle',
-				'name'    => esc_html__( 'Custom Captcha', 'wpforms-lite' ),
-				'name_en' => 'Custom Captcha',
-				'type'    => 'captcha',
-				'group'   => 'fancy',
-				'addon'   => 'wpforms-captcha',
-				'order'   => '300',
+				'icon'     => 'fa-question-circle',
+				'name'     => esc_html__( 'Custom Captcha', 'wpforms-lite' ),
+				'keywords' => esc_html__( 'spam, math, maths, question', 'wpforms-lite' ),
+				'name_en'  => 'Custom Captcha',
+				'type'     => 'captcha',
+				'group'    => 'fancy',
+				'addon'    => 'wpforms-captcha',
+				'order'    => '300',
 			],
 			[
-				'icon'    => 'fa-pencil',
-				'name'    => esc_html__( 'Signature', 'wpforms-lite' ),
-				'name_en' => 'Signature',
-				'type'    => 'signature',
-				'group'   => 'fancy',
-				'addon'   => 'wpforms-signatures',
-				'order'   => '310',
+				'icon'     => 'fa-pencil',
+				'name'     => esc_html__( 'Signature', 'wpforms-lite' ),
+				'keywords' => esc_html__( 'user, e-signature', 'wpforms-lite' ),
+				'name_en'  => 'Signature',
+				'type'     => 'signature',
+				'group'    => 'fancy',
+				'addon'    => 'wpforms-signatures',
+				'order'    => '310',
 			],
 			[
-				'icon'    => 'fa-ellipsis-h',
-				'name'    => esc_html__( 'Likert Scale', 'wpforms-lite' ),
-				'name_en' => 'Likert Scale',
-				'type'    => 'likert_scale',
-				'group'   => 'fancy',
-				'addon'   => 'wpforms-surveys-polls',
-				'order'   => '400',
+				'icon'     => 'fa-ellipsis-h',
+				'name'     => esc_html__( 'Likert Scale', 'wpforms-lite' ),
+				'keywords' => esc_html__( 'survey, rating scale', 'wpforms-lite' ),
+				'name_en'  => 'Likert Scale',
+				'type'     => 'likert_scale',
+				'group'    => 'fancy',
+				'addon'    => 'wpforms-surveys-polls',
+				'order'    => '400',
 			],
 			[
-				'icon'    => 'fa-tachometer',
-				'name'    => esc_html__( 'Net Promoter Score', 'wpforms-lite' ),
-				'name_en' => 'Net Promoter Score',
-				'type'    => 'net_promoter_score',
-				'group'   => 'fancy',
-				'addon'   => 'wpforms-surveys-polls',
-				'order'   => '410',
+				'icon'     => 'fa-tachometer',
+				'name'     => esc_html__( 'Net Promoter Score', 'wpforms-lite' ),
+				'keywords' => esc_html__( 'survey, nps', 'wpforms-lite' ),
+				'name_en'  => 'Net Promoter Score',
+				'type'     => 'net_promoter_score',
+				'group'    => 'fancy',
+				'addon'    => 'wpforms-surveys-polls',
+				'order'    => '410',
 			],
 			[
-				'icon'    => 'fa-file-o',
-				'name'    => esc_html__( 'Single Item', 'wpforms-lite' ),
-				'name_en' => 'Single Item',
-				'type'    => 'payment-single',
-				'group'   => 'payment',
-				'order'   => '1',
+				'icon'     => 'fa-credit-card',
+				'name'     => esc_html__( 'PayPal Commerce', 'wpforms-lite' ),
+				'keywords' => esc_html__( 'store, ecommerce, credit card, pay, payment, debit card', 'wpforms-lite' ),
+				'name_en'  => 'PayPal Commerce',
+				'type'     => 'paypal-commerce',
+				'group'    => 'payment',
+				'addon'    => 'wpforms-paypal-commerce',
+				'order'    => '89',
 			],
 			[
-				'icon'    => 'fa-list-ul',
-				'name'    => esc_html__( 'Multiple Items', 'wpforms-lite' ),
-				'name_en' => 'Multiple Items',
-				'type'    => 'payment-multiple',
-				'group'   => 'payment',
-				'order'   => '2',
+				'icon'     => 'fa-credit-card',
+				'name'     => esc_html__( 'Square', 'wpforms-lite' ),
+				'keywords' => esc_html__( 'store, ecommerce, credit card, pay, payment, debit card', 'wpforms-lite' ),
+				'name_en'  => 'Square',
+				'type'     => 'square',
+				'group'    => 'payment',
+				'addon'    => 'wpforms-square',
+				'order'    => '92',
 			],
 			[
-				'icon'    => 'fa-check-square-o',
-				'name'    => esc_html__( 'Checkbox Items', 'wpforms-lite' ),
-				'name_en' => 'Checkbox Items',
-				'type'    => 'payment-checkbox',
-				'group'   => 'payment',
-				'order'   => '3',
+				'icon'     => 'fa-credit-card',
+				'name'     => esc_html__( 'Authorize.Net', 'wpforms-lite' ),
+				'keywords' => esc_html__( 'store, ecommerce, credit card, pay, payment, debit card', 'wpforms-lite' ),
+				'name_en'  => 'Authorize.Net',
+				'type'     => 'authorize_net',
+				'group'    => 'payment',
+				'addon'    => 'wpforms-authorize-net',
+				'order'    => '95',
 			],
 			[
-				'icon'    => 'fa-caret-square-o-down',
-				'name'    => esc_html__( 'Dropdown Items', 'wpforms-lite' ),
-				'name_en' => 'Dropdown Items',
-				'type'    => 'payment-select',
-				'group'   => 'payment',
-				'order'   => '4',
-			],
-			[
-				'icon'    => 'fa-credit-card',
-				'name'    => esc_html__( 'Stripe Credit Card', 'wpforms-lite' ),
-				'name_en' => 'Stripe Credit Card',
-				'type'    => 'stripe-credit-card',
-				'group'   => 'payment',
-				'addon'   => 'wpforms-stripe',
-				'order'   => '88',
-			],
-			[
-				'icon'    => 'fa-credit-card',
-				'name'    => esc_html__( 'PayPal Commerce', 'wpforms-lite' ),
-				'name_en' => 'PayPal Commerce',
-				'type'    => 'paypal-commerce',
-				'group'   => 'payment',
-				'addon'   => 'wpforms-paypal-commerce',
-				'order'   => '89',
-			],
-			[
-				'icon'    => 'fa-credit-card',
-				'name'    => esc_html__( 'Square', 'wpforms-lite' ),
-				'name_en' => 'Square',
-				'type'    => 'square',
-				'group'   => 'payment',
-				'addon'   => 'wpforms-square',
-				'order'   => '92',
-			],
-			[
-				'icon'    => 'fa-credit-card',
-				'name'    => esc_html__( 'Authorize.Net', 'wpforms-lite' ),
-				'name_en' => 'Authorize.Net',
-				'type'    => 'authorize_net',
-				'group'   => 'payment',
-				'addon'   => 'wpforms-authorize-net',
-				'order'   => '95',
-			],
-			[
-				'icon'    => 'fa-money',
-				'name'    => esc_html__( 'Total', 'wpforms-lite' ),
-				'name_en' => 'Total',
-				'type'    => 'payment-total',
-				'group'   => 'payment',
-				'order'   => '110',
+				'icon'     => 'fa-ticket',
+				'name'     => esc_html__( 'Coupon', 'wpforms-lite' ),
+				'keywords' => esc_html__( 'discount, sale', 'wpforms-lite' ),
+				'name_en'  => 'Coupon',
+				'type'     => 'payment-coupon',
+				'group'    => 'payment',
+				'addon'    => 'wpforms-coupons',
+				'order'    => '100',
 			],
 		];
 
@@ -280,34 +256,48 @@ class Fields {
 	 *
 	 * @since 1.6.6
 	 *
-	 * @return array|false Captcha field data.
+	 * @return array Captcha field data.
 	 */
 	private function get_captcha() {
 
 		$captcha_settings = wpforms_get_captcha_settings();
 
 		if ( empty( $captcha_settings['provider'] ) ) {
-			return false;
+			return [];
 		}
 
+		$captcha = [
+			'hcaptcha'  => [
+				'name' => 'hCaptcha',
+				'icon' => 'fa-question-circle-o',
+			],
+			'recaptcha' => [
+				'name' => 'reCAPTCHA',
+				'icon' => 'fa-google',
+			],
+			'turnstile' => [
+				'name' => 'Turnstile',
+				'icon' => 'fa-question-circle-o',
+			],
+		];
+
 		if ( ! empty( $captcha_settings['site_key'] ) || ! empty( $captcha_settings['secret_key'] ) ) {
-			$captcha_name    = $captcha_settings['provider'] === 'hcaptcha' ? esc_html__( 'hCaptcha', 'wpforms-lite' ) : esc_html__( 'reCAPTCHA', 'wpforms-lite' );
-			$captcha_name_en = $captcha_settings['provider'] === 'hcaptcha' ? 'hCaptcha' : 'reCAPTCHA';
-			$captcha_icon    = $captcha_settings['provider'] === 'hcaptcha' ? 'fa-question-circle-o' : 'fa-google';
+			$captcha_name = $captcha[ $captcha_settings['provider'] ]['name'];
+			$captcha_icon = $captcha[ $captcha_settings['provider'] ]['icon'];
 		} else {
-			$captcha_name    = esc_html__( 'CAPTCHA', 'wpforms-lite' );
-			$captcha_name_en = 'CAPTCHA';
-			$captcha_icon    = 'fa-question-circle-o';
+			$captcha_name = 'CAPTCHA';
+			$captcha_icon = 'fa-question-circle-o';
 		}
 
 		return [
-			'icon'    => $captcha_icon,
-			'name'    => $captcha_name,
-			'name_en' => $captcha_name_en,
-			'type'    => 'captcha_' . $captcha_settings['provider'],
-			'group'   => 'standard',
-			'order'   => 180,
-			'class'   => 'not-draggable',
+			'icon'     => $captcha_icon,
+			'name'     => $captcha_name,
+			'name_en'  => $captcha_name,
+			'keywords' => esc_html__( 'captcha, spam, antispam', 'wpforms-lite' ),
+			'type'     => 'captcha_' . $captcha_settings['provider'],
+			'group'    => 'standard',
+			'order'    => 180,
+			'class'    => 'not-draggable',
 		];
 	}
 

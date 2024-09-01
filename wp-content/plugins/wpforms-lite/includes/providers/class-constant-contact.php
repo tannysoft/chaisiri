@@ -1,11 +1,33 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Constant Contact integration.
  *
  * @since 1.3.6
  */
 class WPForms_Constant_Contact extends WPForms_Provider {
+
+	/**
+	 * Current form ID.
+	 *
+	 * @since 1.9.0.4
+	 *
+	 * @var int
+	 */
+	private $form_id = 0;
+
+	/**
+	 * Current entry ID.
+	 *
+	 * @since 1.9.0.4
+	 *
+	 * @var int
+	 */
+	private $entry_id = 0;
 
 	/**
 	 * Provider access token.
@@ -109,34 +131,25 @@ class WPForms_Constant_Contact extends WPForms_Provider {
 
 			// Check for conditionals.
 			$pass = $this->process_conditionals( $fields, $entry, $form_data, $connection );
+
 			if ( ! $pass ) {
 				wpforms_log(
-					'Constant Contact Subscription stopped by conditional logic',
+					sprintf( 'The Constant Contact connection %s was not processed due to conditional logic.', $connection['name'] ?? '' ),
 					$fields,
-					array(
-						'type'    => array( 'provider', 'conditional_logic' ),
+					[
+						'type'    => [ 'provider', 'conditional_logic' ],
 						'parent'  => $entry_id,
 						'form_id' => $form_data['id'],
-					)
+					]
 				);
 				continue;
 			}
 
-			// Check to see if the lead already exists in Constant Contact.
-			$response = wp_remote_get( 'https://api.constantcontact.com/v2/contacts?api_key=' . $this->api_key . '&access_token=' . $this->access_token . '&email=' . $email );
-			$contact  = json_decode( wp_remote_retrieve_body( $response ), true );
+			$this->form_id  = $form_data['id'] ?? 0;
+			$this->entry_id = $entry_id;
+			$contact        = $this->request( 'https://api.constantcontact.com/v2/contacts?email=' . $email );
 
-			// Return early if there was a problem.
-			if ( isset( $contact['error_key'] ) ) {
-				wpforms_log(
-					'Constant Contact API Error',
-					$contact->get_error_message(),
-					array(
-						'type'    => array( 'provider', 'error' ),
-						'parent'  => $entry_id,
-						'form_id' => $form_data['id'],
-					)
-				);
+			if ( is_wp_error( $contact ) ) {
 				continue;
 			}
 
@@ -144,7 +157,7 @@ class WPForms_Constant_Contact extends WPForms_Provider {
 			 * Setup Merge Vars
 			 */
 
-			$merge_vars = array();
+			$merge_vars = [];
 
 			foreach ( $connection['fields'] as $name => $merge_var ) {
 
@@ -171,26 +184,32 @@ class WPForms_Constant_Contact extends WPForms_Provider {
 
 				// Constant Contact doesn't native URL field so it has to be
 				// stored in a custom field.
-				if ( 'url' === $name ) {
-					$merge_vars['custom_fields'] = array(
-						array(
+				if ( $name === 'url' ) {
+
+					$merge_vars['custom_fields'] = [
+						[
 							'name'  => 'custom_field_1',
 							'value' => $value,
-						),
-					);
+						],
+					];
+
 					continue;
 				}
 
 				// Constant Contact stores name in two fields, so we have to
 				// separate it.
-				if ( 'full_name' === $name ) {
+				if ( $name === 'full_name' ) {
+
 					$names = explode( ' ', $value );
+
 					if ( ! empty( $names[0] ) ) {
 						$merge_vars['first_name'] = $names[0];
 					}
+
 					if ( ! empty( $names[1] ) ) {
 						$merge_vars['last_name'] = $names[1];
 					}
+
 					continue;
 				}
 
@@ -245,21 +264,20 @@ class WPForms_Constant_Contact extends WPForms_Provider {
 
 				// Check if they are already assigned to lists.
 				if ( ! empty( $data['lists'] ) ) {
+					$has_list = false;
 
 					foreach ( $data['lists'] as $list ) {
-
-						// If they are already assigned to this list, return early.
 						if ( isset( $list['id'] ) && (string) $list_id === (string) $list['id'] ) {
-							return;
+							$has_list = true;
 						}
 					}
 
-					// Otherwise, add them to the list.
-					$data['lists'][ count( $data['lists'] ) ] = [
-						'id'     => $list_id,
-						'status' => 'ACTIVE',
-					];
-
+					if ( ! $has_list ) {
+						$data['lists'][ count( $data['lists'] ) ] = [
+							'id'     => $list_id,
+							'status' => 'ACTIVE',
+						];
+					}
 				} else {
 
 					// Add the contact to the list.
@@ -274,16 +292,11 @@ class WPForms_Constant_Contact extends WPForms_Provider {
 
 				// Args to use.
 				$args = [
-					'body'    => wp_json_encode( $data ),
-					'method'  => 'PUT',
-					'headers' => [
-						'Content-Type' => 'application/json',
-					],
+					'body'   => $data,
+					'method' => 'PUT',
 				];
 
-				$update = wp_remote_request( 'https://api.constantcontact.com/v2/contacts/' . $data['id'] . '?api_key=' . $this->api_key . '&access_token=' . $this->access_token . '&action_by=ACTION_BY_VISITOR', $args );
-				$res    = json_decode( wp_remote_retrieve_body( $update ), true );
-
+				$this->request( 'https://api.constantcontact.com/v2/contacts/' . $data['id'] . '?action_by=ACTION_BY_VISITOR', $args );
 			} else {
 				// Add a new contact.
 				$data = [
@@ -296,27 +309,11 @@ class WPForms_Constant_Contact extends WPForms_Provider {
 
 				// Args to use.
 				$args = [
-					'body'    => wp_json_encode( $data ),
-					'headers' => [
-						'Content-Type' => 'application/json',
-					],
+					'body'   => $data,
+					'method' => 'POST',
 				];
 
-				$add = wp_remote_post( 'https://api.constantcontact.com/v2/contacts?api_key=' . $this->api_key . '&access_token=' . $this->access_token . '&action_by=ACTION_BY_VISITOR', $args );
-				$res = json_decode( wp_remote_retrieve_body( $add ), true );
-			}
-
-			// Check for errors.
-			if ( isset( $res['error_key'] ) ) {
-				wpforms_log(
-					'Constant Contact API Error',
-					$res->get_error_message(),
-					[
-						'type'    => [ 'provider', 'error' ],
-						'parent'  => $entry_id,
-						'form_id' => $form_data['id'],
-					]
-				);
+				$this->request( 'https://api.constantcontact.com/v2/contacts?action_by=ACTION_BY_VISITOR', $args );
 			}
 
 		endforeach;
@@ -338,7 +335,8 @@ class WPForms_Constant_Contact extends WPForms_Provider {
 	 */
 	public function api_auth( $data = [], $form_id = '' ) {
 
-		$this->access_token = isset( $data['authcode'] ) ? $data['authcode'] : '';
+		$this->form_id      = (int) $form_id;
+		$this->access_token = $data['authcode'] ?? '';
 		$user               = $this->get_account_information();
 
 		if ( is_wp_error( $user ) ) {
@@ -369,21 +367,7 @@ class WPForms_Constant_Contact extends WPForms_Provider {
 	 */
 	public function get_account_information() {
 
-		$response = wp_remote_get( 'https://api.constantcontact.com/v2/account/info?api_key=' . $this->api_key . '&access_token=' . $this->access_token );
-
-		if ( is_wp_error( $response ) ) {
-			return $response;
-		}
-
-		$user = json_decode( wp_remote_retrieve_body( $response ), true );
-
-		if ( ! empty( $user[0]['error_key'] ) ) {
-			$message = ! empty( $user[0]['error_message'] ) ? $user[0]['error_message'] : '';
-
-			return new WP_Error( $this->slug . '_error', $message );
-		}
-
-		return $response;
+		return $this->request( 'https://api.constantcontact.com/v2/account/info' );
 	}
 
 	/**
@@ -418,28 +402,16 @@ class WPForms_Constant_Contact extends WPForms_Provider {
 	 * @param string $connection_id
 	 * @param string $account_id
 	 *
-	 * @return mixed array or error object
+	 * @return array|WP_Error array or error object
 	 */
 	public function api_lists( $connection_id = '', $account_id = '' ) {
 
 		$this->api_connect( $account_id );
 
-		$request = wp_remote_get( 'https://api.constantcontact.com/v2/lists?api_key=' . $this->api_key . '&access_token=' . $this->access_token );
-		$lists   = json_decode( wp_remote_retrieve_body( $request ), true );
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$this->form_id = ! empty( $_POST['id'] ) ? absint( $_POST['id'] ) : 0;
 
-		if ( empty( $lists ) ) {
-			wpforms_log(
-				'Constant Contact API Error',
-				'',
-				array(
-					'type' => array( 'provider', 'error' ),
-				)
-			);
-
-			return $this->error( esc_html__( 'API list error: Constant API error', 'wpforms-lite' ) );
-		}
-
-		return $lists;
+		return $this->request( 'https://api.constantcontact.com/v2/lists' );
 	}
 
 	/**
@@ -455,54 +427,54 @@ class WPForms_Constant_Contact extends WPForms_Provider {
 	 */
 	public function api_fields( $connection_id = '', $account_id = '', $list_id = '' ) {
 
-		$provider_fields = array(
-			array(
+		$provider_fields = [
+			[
 				'name'       => 'Email',
 				'field_type' => 'email',
 				'req'        => '1',
 				'tag'        => 'email',
-			),
-			array(
+			],
+			[
 				'name'       => 'Full Name',
 				'field_type' => 'name',
 				'tag'        => 'full_name',
-			),
-			array(
+			],
+			[
 				'name'       => 'First Name',
 				'field_type' => 'first',
 				'tag'        => 'first_name',
-			),
-			array(
+			],
+			[
 				'name'       => 'Last Name',
 				'field_type' => 'last',
 				'tag'        => 'last_name',
-			),
-			array(
+			],
+			[
 				'name'       => 'Phone',
 				'field_type' => 'text',
 				'tag'        => 'work_phone',
-			),
-			array(
+			],
+			[
 				'name'       => 'Website',
 				'field_type' => 'text',
 				'tag'        => 'url',
-			),
-			array(
+			],
+			[
 				'name'       => 'Address',
 				'field_type' => 'address',
 				'tag'        => 'address',
-			),
-			array(
+			],
+			[
 				'name'       => 'Job Title',
 				'field_type' => 'text',
 				'tag'        => 'job_title',
-			),
-			array(
+			],
+			[
 				'name'       => 'Company',
 				'field_type' => 'text',
 				'tag'        => 'company_name',
-			),
-		);
+			],
+		];
 
 		return $provider_fields;
 	}
@@ -534,7 +506,7 @@ class WPForms_Constant_Contact extends WPForms_Provider {
 			<p>
 				<?php esc_html_e( 'Please fill out all of the fields below to register your new Constant Contact account.', 'wpforms-lite' ); ?>
 				<br>
-				<a href="https://wpforms.com/docs/how-to-connect-constant-contact-with-wpforms/" target="_blank" rel="noopener noreferrer">
+				<a href="<?php echo esc_url( wpforms_utm_link( 'https://wpforms.com/docs/how-to-connect-constant-contact-with-wpforms/', 'Marketing Integrations', 'Constant Contact Documentation' ) ); ?>" target="_blank" rel="noopener noreferrer">
 					<?php esc_html_e( 'Click here for documentation on connecting WPForms with Constant Contact.', 'wpforms-lite' ); ?>
 				</a>
 			</p>
@@ -673,7 +645,7 @@ class WPForms_Constant_Contact extends WPForms_Provider {
 
 		?>
 		<p>
-			<a href="https://wpforms.com/docs/how-to-connect-constant-contact-with-wpforms/" target="_blank" rel="noopener noreferrer">
+			<a href="<?php echo esc_url( wpforms_utm_link( 'https://wpforms.com/docs/how-to-connect-constant-contact-with-wpforms/', 'Settings - Integration', 'Constant Contact Documentation' ) ); ?>" target="_blank" rel="noopener noreferrer">
 				<?php esc_html_e( 'Click here for documentation on connecting WPForms with Constant Contact.', 'wpforms-lite' ); ?>
 			</a>
 		</p>
@@ -826,6 +798,87 @@ class WPForms_Constant_Contact extends WPForms_Provider {
 		delete_option( 'wpforms_constant_contact' );
 
 		wp_send_json_success();
+	}
+
+	/**
+	 * Request to the Constant Contact API.
+	 *
+	 * @since 1.9.0.4
+	 *
+	 * @param string $url  Request URL.
+	 * @param array  $args Request arguments.
+	 *
+	 * @return array|WP_Error
+	 */
+	private function request( string $url, array $args = [] ) {
+
+		$args['method']                   = $args['method'] ?? 'GET';
+		$args['headers']['Authorization'] = 'Bearer ' . $this->access_token;
+		$args['headers']['Content-Type']  = 'application/json';
+
+		if ( isset( $args['body'] ) ) {
+			$args['body'] = wp_json_encode( $args['body'] );
+		}
+
+		$url      = add_query_arg( 'api_key', $this->api_key, $url );
+		$response = wp_remote_request( $url, $args );
+		$response = is_wp_error( $response ) ? $response : (array) $response;
+
+		return $this->process_response( $response );
+	}
+
+	/**
+	 * Process response.
+	 *
+	 * @since 1.9.0.4
+	 *
+	 * @param array|WP_Error $response Response.
+	 *
+	 * @return array|WP_Error
+	 */
+	public function process_response( $response ) {
+
+		if ( is_wp_error( $response ) ) {
+			$this->log_error( $response );
+
+			return $response;
+		}
+
+		// Body may be set here to an array or null.
+		$body = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		if ( empty( $body ) || isset( $body[0]['error_key'] ) ) {
+			$error_message = $body[0]['error_message'] ?? '';
+			$error         = new WP_Error( $this->slug . '_error', $error_message );
+
+			$this->log_error( $error );
+
+			return $error;
+		}
+
+		return $body;
+	}
+
+	/**
+	 * Log error message.
+	 *
+	 * @since 1.9.0.4
+	 *
+	 * @param WP_Error $error Error.
+	 *
+	 * @return void
+	 */
+	public function log_error( WP_Error $error ) {
+
+		wpforms_log(
+			'Constant Contact API Error',
+			$error->get_error_message(),
+			[
+				'type'    => [ 'provider', 'error' ],
+				'parent'  => $this->entry_id,
+				'form_id' => $this->form_id,
+			]
+		);
 	}
 }
 

@@ -19,6 +19,24 @@ class Preview {
 	public $form_data;
 
 	/**
+	 * Post type.
+	 *
+	 * @since 1.8.8
+	 *
+	 * @var string
+	 */
+	private $post_type;
+
+	/**
+	 * Whether this is a form template.
+	 *
+	 * @since 1.8.8
+	 *
+	 * @var bool
+	 */
+	private $is_form_template;
+
+	/**
 	 * Constructor.
 	 *
 	 * @since 1.5.1
@@ -39,7 +57,7 @@ class Preview {
 	 *
 	 * @return bool
 	 */
-	public function is_preview_page() {
+	public function is_preview_page(): bool {
 
 		// Only proceed for the form preview page.
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -47,7 +65,7 @@ class Preview {
 			return false;
 		}
 
-		// Check for logged-in user with correct capabilities.
+		// Only logged-in users can access the preview page.
 		if ( ! is_user_logged_in() ) {
 			return false;
 		}
@@ -55,12 +73,19 @@ class Preview {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$form_id = absint( $_GET['wpforms_form_preview'] );
 
+		// Make sure the user is allowed to preview the form.
 		if ( ! wpforms_current_user_can( 'view_form_single', $form_id ) ) {
 			return false;
 		}
 
 		// Fetch form details.
 		$this->form_data = wpforms()->get( 'form' )->get( $form_id, [ 'content_only' => true ] );
+
+		// Get the post type for preview item.
+		$this->post_type = get_post_type( $form_id );
+
+		// Check if this is a form template.
+		$this->is_form_template = $this->post_type === 'wpforms-template';
 
 		// Check valid form was found.
 		if ( empty( $this->form_data ) || empty( $this->form_data['id'] ) ) {
@@ -77,6 +102,8 @@ class Preview {
 	 */
 	public function hooks() {
 
+		add_filter( 'wpforms_frontend_assets_header_force_load', '__return_true' );
+		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 		add_action( 'pre_get_posts', [ $this, 'pre_get_posts' ] );
 		add_filter( 'the_title', [ $this, 'the_title' ], 100, 1 );
 		add_filter( 'the_content', [ $this, 'the_content' ], 999 );
@@ -85,6 +112,24 @@ class Preview {
 		add_filter( 'frontpage_template_hierarchy', [ $this, 'force_page_template_hierarchy' ] );
 		add_filter( 'wpforms_smarttags_process_page_title_value', [ $this, 'smart_tags_process_page_title_value' ], 10, 5 );
 		add_filter( 'post_thumbnail_html', '__return_empty_string' );
+	}
+
+	/**
+	 * Enqueue additional form preview styles.
+	 *
+	 * @since 1.8.8
+	 */
+	public function enqueue_assets() {
+
+		$min = wpforms_get_min_suffix();
+
+		// Enqueue the form preview styles.
+		wp_enqueue_style(
+			'wpforms-preview',
+			WPFORMS_PLUGIN_URL . "assets/css/frontend/wpforms-form-preview{$min}.css",
+			[],
+			WPFORMS_VERSION
+		);
 	}
 
 	/**
@@ -102,9 +147,15 @@ class Preview {
 		}
 
 		$query->set( 'page_id', '' );
-		$query->set( 'post_type', 'wpforms' );
+		$query->set( 'post_type', $this->post_type ?? 'wpforms' );
 		$query->set( 'post__in', empty( $this->form_data['id'] ) ? [] : [ (int) $this->form_data['id'] ] );
 		$query->set( 'posts_per_page', 1 );
+
+		// The preview page reads as the home page and as an non-singular posts page, neither of which are actually the case.
+		// So we hardcode the correct values for those properties in the query.
+		$query->is_home     = false;
+		$query->is_singular = true;
+		$query->is_single   = true;
 	}
 
 	/**
@@ -118,14 +169,21 @@ class Preview {
 	 */
 	public function the_title( $title ) {
 
-		if ( in_the_loop() ) {
-			$title = sprintf( /* translators: %s - form title. */
-				esc_html__( '%s Preview', 'wpforms-lite' ),
-				! empty( $this->form_data['settings']['form_title'] ) ? sanitize_text_field( $this->form_data['settings']['form_title'] ) : esc_html__( 'Form', 'wpforms-lite' )
+		if ( ! in_the_loop() ) {
+			return $title;
+		}
+
+		if ( $this->is_form_template ) {
+			return sprintf( /* translators: %s - form name. */
+				esc_html__( '%s Template Preview', 'wpforms-lite' ),
+				! empty( $this->form_data['settings']['form_title'] ) ? sanitize_text_field( $this->form_data['settings']['form_title'] ) : esc_html__( 'Form Template', 'wpforms-lite' )
 			);
 		}
 
-		return $title;
+		return sprintf( /* translators: %s - form name. */
+			esc_html__( '%s Preview', 'wpforms-lite' ),
+			! empty( $this->form_data['settings']['form_title'] ) ? sanitize_text_field( $this->form_data['settings']['form_title'] ) : esc_html__( 'Form', 'wpforms-lite' )
+		);
 	}
 
 	/**
@@ -145,6 +203,8 @@ class Preview {
 			return '';
 		}
 
+		$admin_url = admin_url( 'admin.php' );
+
 		$links = [];
 
 		if ( wpforms_current_user_can( 'edit_form_single', $this->form_data['id'] ) ) {
@@ -156,10 +216,10 @@ class Preview {
 							'view'    => 'fields',
 							'form_id' => absint( $this->form_data['id'] ),
 						],
-						admin_url( 'admin.php' )
+						$admin_url
 					)
 				),
-				'text' => esc_html__( 'Edit Form', 'wpforms-lite' ),
+				'text' => $this->is_form_template ? esc_html__( 'Edit Form Template', 'wpforms-lite' ) : esc_html__( 'Edit Form', 'wpforms-lite' ),
 			];
 		}
 
@@ -172,11 +232,30 @@ class Preview {
 							'view'    => 'list',
 							'form_id' => absint( $this->form_data['id'] ),
 						],
-						admin_url( 'admin.php' )
+						$admin_url
 					)
 				),
 				'text' => esc_html__( 'View Entries', 'wpforms-lite' ),
 			];
+		}
+
+		if (
+			! $this->is_form_template &&
+			wpforms_current_user_can( wpforms_get_capability_manage_options(), $this->form_data['id'] ) &&
+			wpforms()->get( 'payment' )->get_by( 'form_id', $this->form_data['id'] )
+		) {
+				$links[] = [
+					'url'  => esc_url(
+						add_query_arg(
+							[
+								'page'    => 'wpforms-payments',
+								'form_id' => absint( $this->form_data['id'] ),
+							],
+							$admin_url
+						)
+					),
+					'text' => esc_html__( 'View Payments', 'wpforms-lite' ),
+				];
 		}
 
 		if ( ! empty( $_GET['new_window'] ) ) { // phpcs:ignore
@@ -186,8 +265,14 @@ class Preview {
 			];
 		}
 
-		$content  = '<p>';
-		$content .= esc_html__( 'This is a preview of the latest saved revision of your form. If this preview does not match your form, save your changes and then refresh this page. This form preview is not publicly accessible.', 'wpforms-lite' );
+		$content = '';
+
+		$content .= $this->add_preview_notice();
+
+		$content .= '<p>';
+		$content .= $this->is_form_template ?
+			esc_html__( 'This is a preview of the latest saved revision of your form template. If this preview does not match your template, save your changes and then refresh this page. This template preview is not publicly accessible.', 'wpforms-lite' ) :
+			esc_html__( 'This is a preview of the latest saved revision of your form. If this preview does not match your form, save your changes and then refresh this page. This form preview is not publicly accessible.', 'wpforms-lite' );
 
 		if ( ! empty( $links ) ) {
 			$content .= '<br>';
@@ -219,13 +304,57 @@ class Preview {
 					],
 				]
 			),
-			'https://wpforms.com/docs/how-to-properly-test-your-wordpress-forms-before-launching-checklist/'
+			esc_url(
+				wpforms_utm_link(
+					'https://wpforms.com/docs/how-to-properly-test-your-wordpress-forms-before-launching-checklist/',
+					$this->is_form_template ? 'Form Template Preview' : 'Form Preview',
+					'Form Testing Tips Documentation'
+				)
+			)
 		);
 		$content .= '</p>';
 
 		$content .= do_shortcode( '[wpforms id="' . absint( $this->form_data['id'] ) . '"]' );
 
 		return $content;
+	}
+
+	/**
+	 * Add preview notice.
+	 *
+	 * @since 1.8.8
+	 *
+	 * @return string HTML content.
+	 */
+	private function add_preview_notice(): string {
+
+		if ( ! $this->is_form_template ) {
+			return '';
+		}
+
+		$content  = '<div class="wpforms-preview-notice">';
+		$content .= sprintf(
+			'<strong>%s</strong> %s',
+			esc_html__( 'Heads up!', 'wpforms-lite' ),
+			esc_html__( 'You\'re viewing a preview of a form template.', 'wpforms-lite' )
+		);
+
+		if ( wpforms()->is_pro() ) {
+			/** This filter is documented in wpforms/src/Pro/Tasks/Actions/PurgeTemplateEntryTask.php */
+			$delay = (int) apply_filters( 'wpforms_pro_tasks_actions_purge_template_entry_task_delay', DAY_IN_SECONDS ); // phpcs:ignore WPForms.PHP.ValidateHooks.InvalidHookName
+
+			$message = sprintf( /* translators: %s - time period, e.g. 24 hours. */
+				__( 'Entries are automatically deleted after %s.', 'wpforms-lite' ),
+				// The `- 1` hack is to avoid the "1 day" message in favor of "24 hours".
+				human_time_diff( time(), time() + $delay - 1 )
+			);
+
+			$content .= sprintf( '<p>%s</p>', esc_html( $message ) );
+		}
+
+		$content .= '</div>';
+
+		return wp_kses_post( $content );
 	}
 
 	/**
@@ -257,7 +386,7 @@ class Preview {
 	 */
 	public function smart_tags_process_page_title_value( $content, $form_data, $fields, $entry_id, $smart_tag_object ) {
 
-		return sprintf( /* translators: %s - form title. */
+		return sprintf( /* translators: %s - form name. */
 			esc_html__( '%s Preview', 'wpforms-lite' ),
 			! empty( $form_data['settings']['form_title'] ) ? sanitize_text_field( $form_data['settings']['form_title'] ) : esc_html__( 'Form', 'wpforms-lite' )
 		);

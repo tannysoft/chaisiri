@@ -2,10 +2,11 @@
 /**
  * Number slider field frontend template.
  *
+ * @since 1.5.7
+ *
  * @var array  $atts          Additional HTML attributes.
  * @var array  $class         HTML classes.
  * @var array  $datas         Data attributes.
- * @var float  $default_value Default field value.
  * @var float  $max           Upper range limit.
  * @var float  $min           Lower range limit.
  * @var float  $step          Allowed step.
@@ -18,13 +19,13 @@
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
+
 ?>
 
 <input
 	type="range"
 	<?php wpforms_html_attributes( $id, $class, $datas, $atts, true ); ?>
 	<?php echo ! empty( $required ) ? 'required' : ''; ?>
-	value="<?php echo esc_attr( $default_value ); ?>"
 	min="<?php echo esc_attr( $min ); ?>"
 	max="<?php echo esc_attr( $max ); ?>"
 	step="<?php echo esc_attr( $step ); ?>">

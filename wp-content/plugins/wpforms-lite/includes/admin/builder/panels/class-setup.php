@@ -1,5 +1,9 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Setup panel.
  *
@@ -18,10 +22,11 @@ class WPForms_Builder_Panel_Setup extends WPForms_Builder_Panel {
 	public function init() {
 
 		// Define panel information.
-		$this->name  = esc_html__( 'Setup', 'wpforms-lite' );
-		$this->slug  = 'setup';
-		$this->icon  = 'fa-cog';
-		$this->order = 5;
+		$this->name      = esc_html__( 'Setup', 'wpforms-lite' );
+		$this->slug      = 'setup';
+		$this->icon      = 'fa-cog';
+		$this->order     = 5;
+		$this->on_demand = true;
 
 		$this->addons_obj = wpforms()->get( 'addons' );
 	}
@@ -38,7 +43,7 @@ class WPForms_Builder_Panel_Setup extends WPForms_Builder_Panel {
 
 		wp_enqueue_script(
 			'wpforms-builder-setup',
-			WPFORMS_PLUGIN_URL . "assets/js/components/admin/builder/setup{$min}.js",
+			WPFORMS_PLUGIN_URL . "assets/js/admin/builder/setup{$min}.js",
 			[ 'wpforms-builder', 'listjs' ],
 			WPFORMS_VERSION,
 			true
@@ -66,7 +71,7 @@ class WPForms_Builder_Panel_Setup extends WPForms_Builder_Panel {
 		<p class="wpforms-setup-desc secondary-text">
 			<?php
 			printf(
-				wp_kses( /* translators: %1$s - Create template doc link; %2$s - Contact us page link. */
+				wp_kses( /* translators: %1$s - create template doc link, %2$s - Contact us page link. */
 					__( 'To speed up the process you can select from one of our pre-made templates, start with a <a href="#" class="wpforms-trigger-blank">blank form</a> or <a href="%1$s" target="_blank" rel="noopener noreferrer">create your own</a>. Have a suggestion for a new template? <a href="%2$s" target="_blank" rel="noopener noreferrer">We’d love to hear it</a>!', 'wpforms-lite' ),
 					[
 						'strong' => [],
@@ -78,8 +83,8 @@ class WPForms_Builder_Panel_Setup extends WPForms_Builder_Panel {
 						],
 					]
 				),
-				esc_url( wpforms_utm_link( 'https://wpforms.com/docs/how-to-create-a-custom-form-template/', 'builder-templates', 'Create Your Own Template' ) ),
-				esc_url( wpforms_utm_link( 'https://wpforms.com/form-template-suggestion/', 'builder-templates', 'Form Template Suggestion' ) )
+				esc_url( wpforms_utm_link( 'https://wpforms.com/docs/how-to-create-a-custom-form-template/', 'builder-templates', 'Create Your Own Template Documentation' ) ),
+				esc_url( wpforms_utm_link( 'https://wpforms.com/form-template-suggestion/', 'builder-templates', 'Suggest a Template' ) )
 			);
 			?>
 		</p>

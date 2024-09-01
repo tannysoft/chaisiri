@@ -62,11 +62,15 @@ class Notifications {
 	 */
 	public function hooks() {
 
+		add_action( 'wpforms_admin_notifications_update', [ $this, 'update' ] );
+
+		if ( ! wpforms_is_admin_ajax() && ! is_admin() ) {
+			return;
+		}
+
 		add_action( 'wpforms_overview_enqueue', [ $this, 'enqueues' ] );
 
 		add_action( 'wpforms_admin_overview_before_table', [ $this, 'output' ] );
-
-		add_action( 'wpforms_admin_notifications_update', [ $this, 'update' ] );
 
 		add_action( 'deactivate_plugin', [ $this, 'delete' ], 10, 2 );
 
@@ -77,12 +81,17 @@ class Notifications {
 	 * Check if user has access and is enabled.
 	 *
 	 * @since 1.7.5
+	 * @since 1.8.2 Added AS task support.
 	 *
 	 * @return bool
 	 */
 	public function has_access() {
 
-		$access = wpforms_current_user_can( 'view_forms' ) && ! wpforms_setting( 'hide-announcements' );
+		$has_access = ! wpforms_setting( 'hide-announcements', false );
+
+		if ( ! wp_doing_cron() && ! wpforms_doing_wp_cli() ) {
+			$has_access = $has_access && wpforms_current_user_can( 'view_forms' );
+		}
 
 		/**
 		 * Allow modifying state if a user has access.
@@ -91,7 +100,7 @@ class Notifications {
 		 *
 		 * @param bool $access True if user has access.
 		 */
-		return (bool) apply_filters( 'wpforms_admin_notifications_has_access', $access );
+		return (bool) apply_filters( 'wpforms_admin_notifications_has_access', $has_access );
 	}
 
 	/**
@@ -393,12 +402,22 @@ class Notifications {
 	 *
 	 * @since 1.7.5
 	 * @since 1.7.8 Added `wp_cache_flush()` call when the option has been updated.
+	 * @since 1.8.2 Don't fire the update action when it disabled or was fired recently.
 	 */
 	public function update() {
 
+		if ( ! $this->has_access() ) {
+			return;
+		}
+
 		$option = $this->get_option();
-		$data   = [
-			'update'    => time(),
+
+		// Double-check the last update time to prevent multiple requests.
+		if ( ! empty( $option['update'] ) && time() < $option['update'] + DAY_IN_SECONDS ) {
+			return;
+		}
+
+		$data = [
 			'feed'      => $this->fetch_feed(),
 			'events'    => $option['events'],
 			'dismissed' => $option['dismissed'],
@@ -414,6 +433,8 @@ class Notifications {
 		 */
 		$data = (array) apply_filters( 'wpforms_admin_notifications_update_data', $data );
 		// phpcs:enable WPForms.PHP.ValidateHooks.InvalidHookName
+
+		$data['update'] = time();
 
 		// Flush the cache after the option has been updated
 		// for the case when it earlier returns an old value without the new data from DB.
@@ -467,7 +488,7 @@ class Notifications {
 
 		wp_enqueue_script(
 			'wpforms-admin-notifications',
-			WPFORMS_PLUGIN_URL . "assets/js/admin-notifications{$min}.js",
+			WPFORMS_PLUGIN_URL . "assets/js/admin/admin-notifications{$min}.js",
 			[ 'jquery', 'wpforms-lity' ],
 			WPFORMS_VERSION,
 			true
@@ -497,6 +518,11 @@ class Notifications {
 	 */
 	public function output() {
 
+		// Leave early if there are no forms.
+		if ( ! wpforms()->get( 'form' )->forms_exist() ) {
+			return;
+		}
+
 		$notifications = $this->get();
 
 		if ( empty( $notifications ) ) {
@@ -505,23 +531,7 @@ class Notifications {
 
 		$notifications_html   = '';
 		$current_class        = ' current';
-		$content_allowed_tags = [
-			'br'     => [],
-			'em'     => [],
-			'strong' => [],
-			'span'   => [
-				'style' => [],
-			],
-			'p'      => [
-				'id'    => [],
-				'class' => [],
-			],
-			'a'      => [
-				'href'   => [],
-				'target' => [],
-				'rel'    => [],
-			],
-		];
+		$content_allowed_tags = $this->get_allowed_tags();
 
 		foreach ( $notifications as $notification ) {
 
@@ -573,6 +583,34 @@ class Notifications {
 			],
 			true
 		);
+	}
+
+	/**
+	 * Get the allowed HTML tags and their attributes.
+	 *
+	 * @since 1.8.8
+	 *
+	 * @return array
+	 */
+	public function get_allowed_tags(): array {
+
+		return [
+			'br'     => [],
+			'em'     => [],
+			'strong' => [],
+			'span'   => [
+				'style' => [],
+			],
+			'p'      => [
+				'id'    => [],
+				'class' => [],
+			],
+			'a'      => [
+				'href'   => [],
+				'target' => [],
+				'rel'    => [],
+			],
+		];
 	}
 
 	/**
@@ -744,7 +782,13 @@ class Notifications {
 		$data_attr_lity = wp_is_mobile() ? '' : 'data-lity';
 
 		return sprintf(
-			'<a class="wpforms-notifications-badge" href="%1$s" %2$s><i class="fa fa-youtube-play" aria-hidden="true"></i>%3$s</a>',
+			'<a class="wpforms-notifications-badge" href="%1$s" %2$s>
+				<svg fill="none" viewBox="0 0 15 13" aria-hidden="true">
+					<path fill="#fff" d="M4 2.5h7v8H4z"/>
+					<path fill="#D63638" d="M14.2 10.5v-8c0-.4-.2-.8-.5-1.1-.3-.3-.7-.5-1.1-.5H2.2c-.5 0-.8.2-1.1.5-.4.3-.5.7-.5 1.1v8c0 .4.2.8.5 1.1.3.3.6.5 1 .5h10.5c.4 0 .8-.2 1.1-.5.3-.3.5-.7.5-1.1Zm-8.8-.8V3.3l4.8 3.2-4.8 3.2Z"/>
+				</svg>
+				%3$s
+			</a>',
 			esc_url( $video_url ),
 			esc_attr( $data_attr_lity ),
 			esc_html__( 'Watch Video', 'wpforms-lite' )

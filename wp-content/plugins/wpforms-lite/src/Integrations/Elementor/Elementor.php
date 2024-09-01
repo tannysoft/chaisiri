@@ -3,6 +3,7 @@
 namespace WPForms\Integrations\Elementor;
 
 use Elementor\Plugin as ElementorPlugin;
+use WPForms\Frontend\CSSVars;
 use WPForms\Integrations\IntegrationInterface;
 
 /**
@@ -56,6 +57,8 @@ class Elementor implements IntegrationInterface {
 			add_action( 'elementor/widgets/widgets_registered', [ $this, 'register_widget' ] );
 
 		add_action( 'wp_ajax_wpforms_admin_get_form_selector_options', [ $this, 'ajax_get_form_selector_options' ] );
+		add_filter( 'wpforms_integrations_gutenberg_form_selector_allow_render', [ $this, 'disable_gutenberg_block_render' ] );
+		add_filter( 'wpforms_forms_anti_spam_v3_is_honeypot_enabled', [ $this, 'filter_is_honeypot_enabled' ] );
 	}
 
 	/**
@@ -63,7 +66,7 @@ class Elementor implements IntegrationInterface {
 	 *
 	 * @since 1.6.0
 	 */
-	public function init() {
+	public function init() { // phpcs:ignore WPForms.PHP.HooksMethod.InvalidPlaceForAddingHooks
 
 		/**
 		 * Allow developers to determine whether the compatibility layer should be applied.
@@ -73,7 +76,7 @@ class Elementor implements IntegrationInterface {
 		 *
 		 * @param bool $use_compat Use compatibility.
 		 */
-		$use_compat = (bool) apply_filters( 'wpforms_apply_elementor_preview_compat', true );
+		$use_compat = (bool) apply_filters( 'wpforms_apply_elementor_preview_compat', true ); // phpcs:ignore WPForms.PHP.ValidateHooks.InvalidHookName
 
 		if ( $use_compat !== true ) {
 			return;
@@ -109,10 +112,30 @@ class Elementor implements IntegrationInterface {
 		wp_enqueue_script(
 			'wpforms-elementor',
 			WPFORMS_PLUGIN_URL . "assets/js/integrations/elementor/editor{$min}.js",
-			[ 'elementor-frontend', 'jquery', 'wp-util' ],
+			[ 'elementor-frontend', 'jquery', 'wp-util', 'wpforms' ],
 			WPFORMS_VERSION,
 			true
 		);
+
+		if ( $this->is_modern_widget() ) {
+			wp_enqueue_script(
+				'wpforms-elementor-modern',
+				WPFORMS_PLUGIN_URL . "assets/js/integrations/elementor/editor-modern{$min}.js",
+				[ 'wpforms-elementor' ],
+				WPFORMS_VERSION,
+				true
+			);
+		}
+
+		// Define strings for JS.
+		$strings = [
+			'heads_up'                    => esc_html__( 'Heads up!', 'wpforms-lite' ),
+			'cancel'                      => esc_html__( 'Cancel', 'wpforms-lite' ),
+			'confirm'                     => esc_html__( 'Confirm', 'wpforms-lite' ),
+			'reset_style_settings'        => esc_html__( 'Reset Style Settings', 'wpforms-lite' ),
+			'reset_settings_confirm_text' => esc_html__( 'Are you sure you want to reset the style settings for this form? All your current styling will be removed and canʼt be recovered.', 'wpforms-lite' ),
+			'copy_paste_error'            => esc_html__( 'There was an error parsing your JSON code. Please check your code and try again.', 'wpforms-lite' ),
+		];
 
 		wp_localize_script(
 			'wpforms-elementor',
@@ -124,6 +147,12 @@ class Elementor implements IntegrationInterface {
 				'add_form_url'  => admin_url( 'admin.php?page=wpforms-builder&view=setup' ),
 				'css_url'       => WPFORMS_PLUGIN_URL . "assets/css/admin-integrations{$min}.css",
 				'debug'         => wpforms_debug(),
+				'strings'       => $strings,
+				'sizes'         => [
+					'field-size'  => CSSVars::FIELD_SIZE,
+					'label-size'  => CSSVars::LABEL_SIZE,
+					'button-size' => CSSVars::BUTTON_SIZE,
+				],
 			]
 		);
 	}
@@ -144,7 +173,7 @@ class Elementor implements IntegrationInterface {
 		wp_enqueue_script(
 			'wpforms-elementor',
 			WPFORMS_PLUGIN_URL . "assets/js/integrations/elementor/frontend{$min}.js",
-			[ 'elementor-frontend', 'jquery', 'wp-util' ],
+			[ 'elementor-frontend', 'jquery', 'wp-util', 'wpforms' ],
 			WPFORMS_VERSION,
 			true
 		);
@@ -178,6 +207,15 @@ class Elementor implements IntegrationInterface {
 			null,
 			WPFORMS_VERSION
 		);
+
+		// Choices.js.
+		wp_enqueue_script(
+			'choicesjs',
+			WPFORMS_PLUGIN_URL . 'assets/lib/choices.min.js',
+			[],
+			'10.2.0',
+			false
+		);
 	}
 
 	/**
@@ -185,12 +223,15 @@ class Elementor implements IntegrationInterface {
 	 *
 	 * @since 1.6.2
 	 * @since 1.7.6 Added support for new registration method since 3.5.0.
+	 * @since 1.8.3 Added a condition for selecting the required widget instance.
 	 */
 	public function register_widget() {
 
+		$widget_instance = $this->is_modern_widget() ? new WidgetModern() : new Widget();
+
 		version_compare( ELEMENTOR_VERSION, '3.5.0', '>=' ) ?
-			ElementorPlugin::instance()->widgets_manager->register( new Widget() ) :
-			ElementorPlugin::instance()->widgets_manager->register_widget_type( new Widget() );
+			ElementorPlugin::instance()->widgets_manager->register( $widget_instance ) :
+			ElementorPlugin::instance()->widgets_manager->register_widget_type( $widget_instance );
 	}
 
 	/**
@@ -203,5 +244,60 @@ class Elementor implements IntegrationInterface {
 		check_ajax_referer( 'wpforms-elementor-integration', 'nonce' );
 
 		wp_send_json_success( ( new Widget() )->get_form_selector_options() );
+	}
+
+	/**
+	 * Detect modern Widget.
+	 *
+	 * @since 1.8.3
+	 */
+	protected function is_modern_widget() {
+
+		return wpforms_get_render_engine() === 'modern' && (int) wpforms_setting( 'disable-css', '1' ) === 1;
+	}
+
+	/**
+	 * Disable the block render for pages built in Elementor.
+	 *
+	 * @since 1.8.8
+	 *
+	 * @param bool $allow_render Whether to allow the block render.
+	 *
+	 * @return bool Whether to disable the block render.
+	 */
+	public function disable_gutenberg_block_render( $allow_render ): bool {
+
+		$document = ElementorPlugin::$instance->documents->get( get_the_ID() );
+
+		if ( $document && $document->is_built_with_elementor() ) {
+			return false;
+		}
+
+		return $allow_render;
+	}
+
+	/**
+	 * Disable honeypot on the preview panel.
+	 *
+	 * @since 1.9.0
+	 *
+	 * @param bool|mixed $is_enabled True if the honeypot is enabled, false otherwise.
+	 *
+	 * @return bool Whether to disable the honeypot.
+	 * @noinspection PhpUndefinedFieldInspection
+	 */
+	public function filter_is_honeypot_enabled( $is_enabled ): bool {
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$action = sanitize_key( $_REQUEST['action'] ?? '' );
+
+		if (
+			in_array( $action, [ 'elementor', 'elementor_ajax' ], true ) ||
+			ElementorPlugin::$instance->preview->is_preview_mode()
+		) {
+			return false;
+		}
+
+		return (bool) $is_enabled;
 	}
 }

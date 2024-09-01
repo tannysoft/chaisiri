@@ -39,7 +39,7 @@ class FormEmbedWizard {
 		// Form Embed Wizard should load only in the Form Builder and on the Edit/Add Page screen.
 		if (
 			! wpforms_is_admin_page( 'builder' ) &&
-			! wp_doing_ajax() &&
+			! wpforms_is_admin_ajax() &&
 			! $this->is_form_embed_page()
 		) {
 			return;
@@ -74,7 +74,7 @@ class FormEmbedWizard {
 
 		$min = wpforms_get_min_suffix();
 
-		if ( $this->is_form_embed_page() && ! $this->is_challenge_active() ) {
+		if ( $this->is_form_embed_page() && $this->get_meta() && ! $this->is_challenge_active() ) {
 
 			wp_enqueue_style(
 				'wpforms-admin-form-embed-wizard',
@@ -101,7 +101,7 @@ class FormEmbedWizard {
 
 		wp_enqueue_script(
 			'wpforms-admin-form-embed-wizard',
-			WPFORMS_PLUGIN_URL . "assets/js/components/admin/form-embed-wizard{$min}.js",
+			WPFORMS_PLUGIN_URL . "assets/js/admin/form-embed-wizard{$min}.js",
 			[ 'jquery', 'underscore' ],
 			WPFORMS_VERSION
 		);
@@ -129,10 +129,15 @@ class FormEmbedWizard {
 	 */
 	public function output() {
 
-		// We do not need to output tooltip if Challenge is active.
+		// We don't need to output tooltip if Challenge is active.
 		if ( $this->is_form_embed_page() && $this->is_challenge_active() ) {
 			$this->delete_meta();
 
+			return;
+		}
+
+		// We don't need to output tooltip if it's not an embed flow.
+		if ( $this->is_form_embed_page() && ! $this->get_meta() ) {
 			return;
 		}
 
@@ -161,7 +166,7 @@ class FormEmbedWizard {
 
 		static $challenge_active = null;
 
-		if ( is_null( $challenge_active ) ) {
+		if ( $challenge_active === null ) {
 			$challenge        = wpforms()->get( 'challenge' );
 			$challenge_active = method_exists( $challenge, 'challenge_active' ) ? $challenge->challenge_active() : false;
 		}

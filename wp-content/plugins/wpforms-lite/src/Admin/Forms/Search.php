@@ -116,8 +116,12 @@ class Search {
 	 */
 	public function get_forms_args( $args ) {
 
-		$args['search']['term']         = $this->term;
-		$args['search']['term_escaped'] = $this->term_escaped;
+		if ( is_numeric( $this->term ) ) {
+			$args['post__in'] = [ absint( $this->term ) ];
+		} else {
+			$args['search']['term']         = $this->term;
+			$args['search']['term_escaped'] = $this->term_escaped;
+		}
 
 		return $args;
 	}
@@ -165,6 +169,10 @@ class Search {
 	 */
 	public function search_by_term_where( $where, $wp_query ) {
 
+		if ( is_numeric( $this->term ) ) {
+			return $where;
+		}
+
 		global $wpdb;
 
 		// When user types only HTML tag (<section> for example), the sanitized term we will be empty.
@@ -180,8 +188,8 @@ class Search {
 		// Prepare the WHERE clause to search form title and description.
 		$where .= $wpdb->prepare(
 			" AND (
-				{$wpdb->posts}.post_title LIKE %s OR
-				{$wpdb->posts}.post_excerpt LIKE %s
+				$wpdb->posts.post_title LIKE %s OR
+				$wpdb->posts.post_excerpt LIKE %s
 			)",
 			'%' . $wpdb->esc_like( esc_html( $this->term ) ) . '%',
 			'%' . $wpdb->esc_like( $this->term ) . '%'

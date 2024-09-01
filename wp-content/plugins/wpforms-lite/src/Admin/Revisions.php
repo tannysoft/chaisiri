@@ -66,24 +66,6 @@ class Revisions {
 	private $viewed;
 
 	/**
-	 * Date format to use in UI.
-	 *
-	 * @since 1.7.3
-	 *
-	 * @var string
-	 */
-	private $date_format = 'M j';
-
-	/**
-	 * Time format to use in UI.
-	 *
-	 * @since 1.7.3
-	 *
-	 * @var string
-	 */
-	private $time_format;
-
-	/**
 	 * Initialize the class if preconditions are met.
 	 *
 	 * @since 1.7.3
@@ -117,8 +99,6 @@ class Revisions {
 		if ( $this->revision_id && ! $this->revision instanceof WP_Post ) {
 			return;
 		}
-
-		$this->time_format = get_option( 'time_format' );
 
 		$this->hooks();
 	}
@@ -205,10 +185,11 @@ class Revisions {
 	public function get_formatted_datetime( $datetime, $part = 'date' ) {
 
 		if ( $part === 'time' ) {
-			return wpforms_datetime_format( $datetime, $this->time_format, true );
+			return wpforms_time_format( $datetime, '', true );
 		}
 
-		return wpforms_datetime_format( $datetime, $this->date_format, true );
+		// M j format needs to keep one-line date.
+		return wpforms_date_format( $datetime, 'M j', true );
 	}
 
 	/**
@@ -327,12 +308,12 @@ class Revisions {
 		$args['author_id'] = $current_revision->post_author;
 
 		foreach ( $revisions as $revision ) {
-			$time_diff = sprintf( /* translators: %s - Relative time difference, e.g. "5 minutes", "12 days". */
+			$time_diff = sprintf( /* translators: %s - relative time difference, e.g. "5 minutes", "12 days". */
 				__( '%s ago', 'wpforms-lite' ),
 				human_time_diff( strtotime( $revision->post_modified_gmt . ' +0000' ) )
 			);
 
-			$date_time = sprintf( /* translators: %1$s - date, %2$s - time when revision was created, e.g. "Dec 25 at 12:57pm". */
+			$date_time = sprintf( /* translators: %1$s - date, %2$s - time when item was created, e.g. "Oct 22 at 11:11am". */
 				__( '%1$s at %2$s', 'wpforms-lite' ),
 				$this->get_formatted_datetime( $revision->post_modified_gmt ),
 				$this->get_formatted_datetime( $revision->post_modified_gmt, 'time' )

@@ -11,6 +11,11 @@ use WPForms\Tasks\Actions\EntryEmailsTask;
  * Heavily influenced by the great AffiliateWP plugin by Pippin Williamson.
  * https://github.com/AffiliateWP/AffiliateWP/blob/master/includes/emails/class-affwp-emails.php
  *
+ * Note that this mailer class is no longer in active use and has been replaced with the "WPForms\Emails\Notifications" class.
+ * Please refer to the new mailer wrapper extension to extend or add further customizations.
+ *
+ * @deprecated 1.8.5
+ *
  * @since 1.1.3
  */
 class WPForms_WP_Emails {
@@ -103,7 +108,7 @@ class WPForms_WP_Emails {
 	 *
 	 * @var array
 	 */
-	public $form_data = array();
+	public $form_data = [];
 
 	/**
 	 * Fields, formatted, and sanitized.
@@ -112,7 +117,7 @@ class WPForms_WP_Emails {
 	 *
 	 * @var array
 	 */
-	public $fields = array();
+	public $fields = [];
 
 	/**
 	 * Entry ID.
@@ -143,8 +148,8 @@ class WPForms_WP_Emails {
 			$this->html = false;
 		}
 
-		add_action( 'wpforms_email_send_before', array( $this, 'send_before' ) );
-		add_action( 'wpforms_email_send_after', array( $this, 'send_after' ) );
+		add_action( 'wpforms_email_send_before', [ $this, 'send_before' ] );
+		add_action( 'wpforms_email_send_after', [ $this, 'send_after' ] );
 	}
 
 	/**
@@ -240,6 +245,10 @@ class WPForms_WP_Emails {
 	 * @return string The email reply-to address.
 	 */
 	public function get_cc() {
+
+		if ( is_array( $this->cc ) ) {
+			$this->cc = implode( ',', $this->cc );
+		}
 
 		if ( ! empty( $this->cc ) ) {
 
@@ -369,7 +378,7 @@ class WPForms_WP_Emails {
 	 *
 	 * @return bool
 	 */
-	public function send( $to, $subject, $message, $attachments = array() ) {
+	public function send( $to, $subject, $message, $attachments = [] ) {
 
 		if ( ! did_action( 'init' ) && ! did_action( 'admin_init' ) ) {
 			_doing_it_wrong( __FUNCTION__, esc_html__( 'You cannot send emails with WPForms_WP_Emails() until init/admin_init has been reached.', 'wpforms-lite' ), null );
@@ -393,7 +402,7 @@ class WPForms_WP_Emails {
 		// Deprecated filter for $attachments.
 		$attachments = apply_filters_deprecated(
 			'wpforms_email_attachments',
-			array( $attachments, $this ),
+			[ $attachments, $this ],
 			'1.5.7 of the WPForms plugin',
 			'wpforms_emails_send_email_data'
 		);
@@ -405,21 +414,24 @@ class WPForms_WP_Emails {
 		 */
 		$data = apply_filters(
 			'wpforms_emails_send_email_data',
-			array(
+			[
 				'to'          => $to,
 				'subject'     => $subject,
 				'message'     => $message,
 				'headers'     => $this->get_headers(),
 				'attachments' => $attachments,
-			),
+			],
 			$this
 		);
 
+		$entry_obj = wpforms()->get( 'entry' );
+
+		// phpcs:ignore WPForms.Comments.PHPDocHooks.RequiredHookDocumentation, WPForms.PHP.ValidateHooks.InvalidHookName
 		$send_same_process = apply_filters(
 			'wpforms_tasks_entry_emails_trigger_send_same_process',
 			false,
 			$this->fields,
-			! empty( wpforms()->entry ) ? wpforms()->entry->get( $this->entry_id ) : [],
+			$entry_obj ? $entry_obj->get( $this->entry_id ) : [],
 			$this->form_data,
 			$this->entry_id,
 			'entry'
@@ -469,9 +481,9 @@ class WPForms_WP_Emails {
 	 */
 	public function send_before() {
 
-		add_filter( 'wp_mail_from', array( $this, 'get_from_address' ) );
-		add_filter( 'wp_mail_from_name', array( $this, 'get_from_name' ) );
-		add_filter( 'wp_mail_content_type', array( $this, 'get_content_type' ) );
+		add_filter( 'wp_mail_from', [ $this, 'get_from_address' ] );
+		add_filter( 'wp_mail_from_name', [ $this, 'get_from_name' ] );
+		add_filter( 'wp_mail_content_type', [ $this, 'get_content_type' ] );
 	}
 
 	/**
@@ -481,9 +493,9 @@ class WPForms_WP_Emails {
 	 */
 	public function send_after() {
 
-		remove_filter( 'wp_mail_from', array( $this, 'get_from_address' ) );
-		remove_filter( 'wp_mail_from_name', array( $this, 'get_from_name' ) );
-		remove_filter( 'wp_mail_content_type', array( $this, 'get_content_type' ) );
+		remove_filter( 'wp_mail_from', [ $this, 'get_from_address' ] );
+		remove_filter( 'wp_mail_from_name', [ $this, 'get_from_name' ] );
+		remove_filter( 'wp_mail_content_type', [ $this, 'get_content_type' ] );
 	}
 
 	/**
@@ -520,7 +532,7 @@ class WPForms_WP_Emails {
 	 */
 	public function process_tag( $string = '' ) {
 
-		return wpforms_process_smart_tags( $string, $this->form_data, $this->fields, $this->entry_id );
+		return wpforms_process_smart_tags( $string, $this->form_data, $this->fields, $this->entry_id, 'email' );
 	}
 
 	/**
@@ -558,7 +570,7 @@ class WPForms_WP_Emails {
 			$field_template = ob_get_clean();
 
 			// Check to see if user has added support for field type.
-			$other_fields = apply_filters( 'wpforms_email_display_other_fields', array(), $this );
+			$other_fields = apply_filters( 'wpforms_email_display_other_fields', [], $this );
 
 			$x = 1;
 
@@ -571,7 +583,9 @@ class WPForms_WP_Emails {
 				// field data, then it's a non-input based field, "other fields".
 				if ( empty( $this->fields[ $field_id ] ) ) {
 
-					if ( empty( $other_fields ) || ! in_array( $field['type'], $other_fields, true ) ) {
+					// Check if the field type is in $other_fields, otherwise skip.
+					// Skip if the field is conditionally hidden.
+					if ( empty( $other_fields ) || ! in_array( $field['type'], $other_fields, true ) || wpforms_conditional_logic_fields()->field_is_hidden( $this->form_data, $field_id ) ) {
 						continue;
 					}
 
@@ -586,17 +600,9 @@ class WPForms_WP_Emails {
 						$field_name = str_repeat( '&mdash;', 6 ) . ' ' . $title . ' ' . str_repeat( '&mdash;', 6 );
 					} elseif ( $field['type'] === 'html' ) {
 
-						if ( $this->is_field_conditionally_hidden( $field['id'] ) ) {
-							continue;
-						}
-
 						$field_name = ! empty( $field['name'] ) ? $field['name'] : esc_html__( 'HTML / Code Block', 'wpforms-lite' );
 						$field_val  = $field['code'];
 					} elseif ( $field['type'] === 'content' ) {
-
-						if ( $this->is_field_conditionally_hidden( $field['id'] ) ) {
-							continue;
-						}
 
 						$field_name = esc_html__( 'Content', 'wpforms-lite' );
 						$field_val  = $field['content'];
@@ -610,14 +616,28 @@ class WPForms_WP_Emails {
 						continue;
 					}
 
-					$field_name = isset( $this->fields[ $field_id ]['name'] ) ? $this->fields[ $field_id ]['name'] : '';
-					$field_val  = empty( $this->fields[ $field_id ]['value'] ) && ! is_numeric( $this->fields[ $field_id ]['value'] ) ? '<em>' . esc_html__( '(empty)', 'wpforms-lite' ) . '</em>' : $this->fields[ $field_id ]['value'];
+					if ( $field['type'] === 'payment-total' ) {
+
+						$field_name = isset( $this->fields[ $field_id ]['name'] ) ? $this->fields[ $field_id ]['name'] : '';
+
+						// Replace the payment total value if an order summary is enabled.
+						// Ideally, it could be done through the `wpforms_html_field_value` filter,
+						// but needed data is missed there, e.g. entry data ($this->fields).
+						if ( ! empty( $field['summary'] ) ) {
+							$field_val = $this->process_tag( '{order_summary}' );
+						} else {
+							$field_val = $this->fields[ $field_id ]['value'];
+						}
+					} else {
+						$field_name = isset( $this->fields[ $field_id ]['name'] ) ? $this->fields[ $field_id ]['name'] : '';
+						$field_val  = empty( $this->fields[ $field_id ]['value'] ) && ! is_numeric( $this->fields[ $field_id ]['value'] ) ? '<em>' . esc_html__( '(empty)', 'wpforms-lite' ) . '</em>' : $this->fields[ $field_id ]['value'];
+					}
 				}
 
 				if ( empty( $field_name ) && null !== $field_name ) {
 					$field_name = sprintf( /* translators: %d - field ID. */
-						esc_html__( 'Field ID #%d', 'wpforms-lite' ),
-						absint( $field['id'] )
+						esc_html__( 'Field ID #%s', 'wpforms-lite' ),
+						wpforms_validate_field_id( $field['id'] )
 					);
 				}
 
@@ -661,8 +681,8 @@ class WPForms_WP_Emails {
 
 				if ( empty( $field_name ) ) {
 					$field_name = sprintf( /* translators: %d - field ID. */
-						esc_html__( 'Field ID #%d', 'wpforms-lite' ),
-						absint( $field['id'] )
+						esc_html__( 'Field ID #%s', 'wpforms-lite' ),
+						wpforms_validate_field_id( $field['id'] )
 					);
 				}
 
@@ -722,10 +742,12 @@ class WPForms_WP_Emails {
 	public function get_template_part( $slug, $name = null, $load = true ) {
 
 		// Setup possible parts.
-		$templates = array();
+		$templates = [];
+
 		if ( isset( $name ) ) {
 			$templates[] = $slug . '-' . $name . '.php';
 		}
+
 		$templates[] = $slug . '.php';
 
 		// Return the part that is found.
@@ -799,11 +821,11 @@ class WPForms_WP_Emails {
 
 		$template_dir = 'wpforms-email';
 
-		$file_paths = array(
+		$file_paths = [
 			1   => trailingslashit( get_stylesheet_directory() ) . $template_dir,
 			10  => trailingslashit( get_template_directory() ) . $template_dir,
 			100 => WPFORMS_PLUGIN_DIR . 'includes/emails/templates',
-		);
+		];
 
 		$file_paths = apply_filters( 'wpforms_email_template_paths', $file_paths );
 
@@ -829,19 +851,5 @@ class WPForms_WP_Emails {
 		$subject = trim( str_replace( [ "\r\n", "\r", "\n" ], ' ', $subject ) );
 
 		return wpforms_decode_string( $subject );
-	}
-
-	/**
-	 * If CL is enabled and the field is conditionally hidden, hide it from message.
-	 *
-	 * @since 1.7.9
-	 *
-	 * @param int $field_id Field ID.
-	 *
-	 * @return bool
-	 */
-	private function is_field_conditionally_hidden( $field_id ) {
-
-		return ! empty( $this->form_data['fields'][ $field_id ]['conditionals'] ) && ! wpforms_conditional_logic_fields()->field_is_visible( $this->form_data, $field_id );
 	}
 }

@@ -1,8 +1,11 @@
 <?php
 
-namespace WPForms\Migrations;
+// phpcs:disable Generic.Commenting.DocComment.MissingShort
+/** @noinspection PhpIllegalPsrClassPathInspection */
+/** @noinspection AutoloadingIssuesInspection */
+// phpcs:enable Generic.Commenting.DocComment.MissingShort
 
-use WPForms\Tasks\Meta;
+namespace WPForms\Migrations;
 
 /**
  * Class Migrations handles Lite plugin upgrade routines.
@@ -37,14 +40,10 @@ class Migrations extends Base {
 		'Upgrade175',
 		'Upgrade1751',
 		'Upgrade177',
-	];
-
-	/**
-	 * Custom table handler classes.
-	 *
-	 * @since 1.7.6
-	 */
-	const CUSTOM_TABLE_HANDLER_CLASSES = [
-		Meta::class,
+		'Upgrade182',
+		'Upgrade183',
+		'Upgrade184',
+		'Upgrade186',
+		'Upgrade187',
 	];
 }

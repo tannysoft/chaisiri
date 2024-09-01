@@ -1,9 +1,17 @@
 <?php
 
+// phpcs:ignore Generic.Commenting.DocComment.MissingShort
+/** @noinspection PhpIllegalPsrClassPathInspection */
+
+// phpcs:ignore Universal.Namespaces.DisallowCurlyBraceSyntax.Forbidden
 namespace WPForms {
 
 	use AllowDynamicProperties;
 	use stdClass;
+	use WPForms\Helpers\DB;
+	use WPForms_Form_Handler;
+	use WPForms_Process;
+	use WPForms_Settings;
 
 	/**
 	 * Main WPForms class.
@@ -18,7 +26,7 @@ namespace WPForms {
 		 *
 		 * @since 1.0.0
 		 *
-		 * @var \WPForms\WPForms
+		 * @var WPForms
 		 */
 		private static $instance;
 
@@ -78,6 +86,7 @@ namespace WPForms {
 		 * @param string $name Name of the object to get.
 		 *
 		 * @return mixed|null
+		 * @noinspection MagicMethodsValidityInspection
 		 */
 		public function __get( $name ) {
 
@@ -90,6 +99,12 @@ namespace WPForms {
 			}
 
 			if ( $name === 'pro' ) {
+				_deprecated_argument(
+					'wpforms()->pro',
+					'1.8.2.2 of the WPForms plugin',
+					'Please use `wpforms()->is_pro()` instead.'
+				);
+
 				return wpforms()->is_pro();
 			}
 
@@ -100,13 +115,14 @@ namespace WPForms {
 		 * Main WPForms Instance.
 		 *
 		 * Only one instance of WPForms exists in memory at any one time.
-		 * Also prevent the need to define globals all over the place.
+		 * Also, prevent the need to define globals all over the place.
 		 *
 		 * @since 1.0.0
 		 *
 		 * @return WPForms
+		 * @noinspection UsingInclusionOnceReturnValueInspection
 		 */
-		public static function instance() {
+		public static function instance(): WPForms {
 
 			if (
 				self::$instance === null ||
@@ -125,7 +141,7 @@ namespace WPForms {
 					require_once WPFORMS_PLUGIN_DIR . 'lite/wpforms-lite.php';
 				}
 
-				add_action( 'plugins_loaded', [ self::$instance, 'objects' ], 10 );
+				self::hooks();
 			}
 
 			return self::$instance;
@@ -133,7 +149,7 @@ namespace WPForms {
 
 		/**
 		 * Setup plugin constants.
-		 * All the path/URL related constants are defined in main plugin file.
+		 * All the path/URL related constants are defined in the main plugin file.
 		 *
 		 * @since 1.0.0
 		 */
@@ -159,18 +175,19 @@ namespace WPForms {
 		 */
 		private function includes() {
 
+			$this->error_handler();
+
 			require_once WPFORMS_PLUGIN_DIR . 'includes/class-db.php';
 			require_once WPFORMS_PLUGIN_DIR . 'includes/functions.php';
 			require_once WPFORMS_PLUGIN_DIR . 'includes/compat.php';
+			require_once WPFORMS_PLUGIN_DIR . 'includes/fields/class-base.php';
 
 			$this->includes_magic();
 
 			// Global includes.
-			require_once WPFORMS_PLUGIN_DIR . 'includes/functions-list.php';
 			require_once WPFORMS_PLUGIN_DIR . 'includes/class-install.php';
 			require_once WPFORMS_PLUGIN_DIR . 'includes/class-form.php';
 			require_once WPFORMS_PLUGIN_DIR . 'includes/class-fields.php';
-			require_once WPFORMS_PLUGIN_DIR . 'includes/class-frontend.php';
 			// TODO: class-templates.php should be loaded in admin area only.
 			require_once WPFORMS_PLUGIN_DIR . 'includes/class-templates.php';
 			// TODO: class-providers.php should be loaded in admin area only.
@@ -186,7 +203,6 @@ namespace WPForms {
 				require_once WPFORMS_PLUGIN_DIR . 'includes/admin/admin.php';
 				require_once WPFORMS_PLUGIN_DIR . 'includes/admin/class-notices.php';
 				require_once WPFORMS_PLUGIN_DIR . 'includes/admin/class-menu.php';
-				require_once WPFORMS_PLUGIN_DIR . 'includes/admin/overview/class-overview.php';
 				require_once WPFORMS_PLUGIN_DIR . 'includes/admin/builder/class-builder.php';
 				require_once WPFORMS_PLUGIN_DIR . 'includes/admin/builder/functions.php';
 				require_once WPFORMS_PLUGIN_DIR . 'includes/admin/class-settings.php';
@@ -199,11 +215,36 @@ namespace WPForms {
 		}
 
 		/**
+		 * Hooks.
+		 *
+		 * @since 1.9.0
+		 *
+		 * @return void
+		 */
+		private static function hooks() {
+
+			add_action( 'plugins_loaded', [ self::$instance, 'objects' ] );
+			add_action( 'wpforms_settings_init', [ self::$instance, 'reinstall_custom_tables' ] );
+		}
+
+		/**
+		 * Include the error handler to suppress deprecated messages from vendor folders.
+		 *
+		 * @since 1.8.5
+		 */
+		private function error_handler() {
+
+			require_once WPFORMS_PLUGIN_DIR . 'src/ErrorHandler.php';
+
+			( new ErrorHandler() )->init();
+		}
+
+		/**
 		 * Including the new files with PHP 5.3 style.
 		 *
 		 * @since 1.4.7
 		 */
-		private function includes_magic() {
+		private function includes_magic() { // phpcs:ignore WPForms.PHP.HooksMethod.InvalidPlaceForAddingHooks
 
 			// Action Scheduler requires a special loading procedure.
 			require_once WPFORMS_PLUGIN_DIR . 'vendor/woocommerce/action-scheduler/action-scheduler.php';
@@ -220,11 +261,6 @@ namespace WPForms {
 			);
 
 			/*
-			 * Load email subsystem.
-			 */
-			add_action( 'wpforms_loaded', [ '\WPForms\Emails\Summaries', 'get_instance' ] );
-
-			/*
 			 * Load admin components. Exclude from frontend.
 			 */
 			if ( is_admin() ) {
@@ -232,17 +268,12 @@ namespace WPForms {
 			}
 
 			/*
-			 * Load form components.
-			 */
-			add_action( 'wpforms_loaded', [ '\WPForms\Forms\Loader', 'get_instance' ] );
-
-			/*
-			 * Properly init the providers loader, that will handle all the related logic and further loading.
+			 * Properly init the providers' loader, that will handle all the related logic and further loading.
 			 */
 			add_action( 'wpforms_loaded', [ '\WPForms\Providers\Providers', 'get_instance' ] );
 
 			/*
-			 * Properly init the integrations loader, that will handle all the related logic and further loading.
+			 * Properly init the integration loader, that will handle all the related logic and further loading.
 			 */
 			add_action( 'wpforms_loaded', [ '\WPForms\Integrations\Loader', 'get_instance' ] );
 		}
@@ -255,12 +286,39 @@ namespace WPForms {
 		public function objects() {
 
 			// Global objects.
-			$this->form     = new \WPForms_Form_Handler();
-			$this->frontend = new \WPForms_Frontend();
-			$this->process  = new \WPForms_Process();
+			$this->registry['form']    = new WPForms_Form_Handler();
+			$this->registry['process'] = new WPForms_Process();
 
-			// Hook now that all of the WPForms stuff is loaded.
+			/**
+			 * Executes when all the WPForms stuff was loaded.
+			 *
+			 * @since 1.4.0
+			 */
 			do_action( 'wpforms_loaded' );
+		}
+
+		/**
+		 * Re-create plugin custom tables if don't exist.
+		 *
+		 * @since 1.9.0
+		 *
+		 * @param WPForms_Settings $wpforms_settings WPForms settings object.
+		 */
+		public function reinstall_custom_tables( WPForms_Settings $wpforms_settings ) {
+
+			if ( empty( $wpforms_settings->view ) ) {
+				return;
+			}
+
+			// Proceed on Settings plugin admin area page only.
+			if ( $wpforms_settings->view !== 'general' ) {
+				return;
+			}
+
+			// Install on a current site only.
+			if ( ! DB::custom_tables_exist() ) {
+				DB::create_custom_tables();
+			}
 		}
 
 		/**
@@ -268,40 +326,45 @@ namespace WPForms {
 		 *
 		 * @since 1.5.7
 		 *
-		 * @param array $class Class registration info.
+		 * @param array $class_data Class registration info.
+		 *
+		 * $class_data array accepts these params: name, id, hook, run, condition.
+		 * - name: required -- class name to register.
+		 * - id: optional -- class ID to register.
+		 * - hook: optional -- hook to register the class on -- default wpforms_loaded.
+		 * - run: optional -- method to run on class instantiation -- default init.
+		 * - condition: optional -- condition to check before registering the class.
 		 */
-		public function register( $class ) {
+		public function register( $class_data ) { // phpcs:ignore Generic.Metrics.CyclomaticComplexity.MaxExceeded, WPForms.PHP.HooksMethod.InvalidPlaceForAddingHooks
 
-			if ( empty( $class['name'] ) || ! is_string( $class['name'] ) ) {
+			if ( empty( $class_data['name'] ) || ! is_string( $class_data['name'] ) ) {
 				return;
 			}
 
-			if ( isset( $class['condition'] ) && empty( $class['condition'] ) ) {
+			if ( isset( $class_data['condition'] ) && empty( $class_data['condition'] ) ) {
 				return;
 			}
 
-			$full_name = $this->is_pro() ? '\WPForms\Pro\\' . $class['name'] : '\WPForms\Lite\\' . $class['name'];
-			$full_name = class_exists( $full_name ) ? $full_name : '\WPForms\\' . $class['name'];
+			$full_name = $this->is_pro() ? '\WPForms\Pro\\' . $class_data['name'] : '\WPForms\Lite\\' . $class_data['name'];
+			$full_name = class_exists( $full_name ) ? $full_name : '\WPForms\\' . $class_data['name'];
 
 			if ( ! class_exists( $full_name ) ) {
 				return;
 			}
 
-			$pattern  = '/[^a-zA-Z0-9_\\\-]/';
-			$id       = isset( $class['id'] ) ? $class['id'] : '';
-			$id       = $id ? preg_replace( $pattern, '', (string) $id ) : $id;
-			$hook     = isset( $class['hook'] ) ? $class['hook'] : 'wpforms_loaded';
-			$hook     = $hook ? preg_replace( $pattern, '', (string) $hook ) : $hook;
-			$run      = isset( $class['run'] ) ? $class['run'] : 'init';
-			$priority = isset( $class['priority'] ) && is_int( $class['priority'] ) ? $class['priority'] : 10;
+			$id       = $class_data['id'] ?? '';
+			$id       = $id ? preg_replace( '/[^a-z_]/', '', (string) $id ) : $id;
+			$hook     = isset( $class_data['hook'] ) ? (string) $class_data['hook'] : 'wpforms_loaded';
+			$run      = $class_data['run'] ?? 'init';
+			$priority = isset( $class_data['priority'] ) && is_int( $class_data['priority'] ) ? $class_data['priority'] : 10;
 
 			$callback = function () use ( $full_name, $id, $run ) {
 
+				// Instantiate class.
 				$instance = new $full_name();
 
-				if ( $id && ! array_key_exists( $id, $this->registry ) ) {
-					$this->registry[ $id ] = $instance;
-				}
+				$this->register_instance( $id, $instance );
+
 				if ( $run && method_exists( $instance, $run ) ) {
 					$instance->{$run}();
 				}
@@ -311,6 +374,21 @@ namespace WPForms {
 				add_action( $hook, $callback, $priority );
 			} else {
 				$callback();
+			}
+		}
+
+		/**
+		 * Register any class instance.
+		 *
+		 * @since 1.8.6
+		 *
+		 * @param string $id       Class ID.
+		 * @param object $instance Any class instance (object).
+		 */
+		public function register_instance( $id, $instance ) {
+
+			if ( $id && is_object( $instance ) && ! array_key_exists( $id, $this->registry ) ) {
+				$this->registry[ $id ] = $instance;
 			}
 		}
 
@@ -350,7 +428,7 @@ namespace WPForms {
 			// Backward compatibility for old public properties.
 			// Return null to save old condition for these properties.
 			if ( in_array( $name, $this->legacy_properties, true ) ) {
-				return isset( $this->{$name} ) ? $this->{$name} : null;
+				return $this->{$name} ?? null;
 			}
 
 			return new stdClass();
@@ -363,13 +441,10 @@ namespace WPForms {
 		 *
 		 * @return array List of table names.
 		 */
-		public function get_existing_custom_tables() {
+		public function get_existing_custom_tables(): array {
 
-			global $wpdb;
-
-			$tables = $wpdb->get_results( "SHOW TABLES LIKE '" . $wpdb->prefix . "wpforms_%'", 'ARRAY_N' ); // phpcs:ignore
-
-			return ! empty( $tables ) ? wp_list_pluck( $tables, 0 ) : [];
+			// phpcs:ignore WPForms.Formatting.EmptyLineBeforeReturn.RemoveEmptyLineBeforeReturnStatement
+			return DB::get_existing_custom_tables();
 		}
 
 		/**
@@ -393,6 +468,7 @@ namespace WPForms {
 	}
 }
 
+// phpcs:ignore Universal.Namespaces.DisallowCurlyBraceSyntax.Forbidden, Universal.Namespaces.DisallowDeclarationWithoutName.Forbidden, Universal.Namespaces.OneDeclarationPerFile.MultipleFound
 namespace {
 
 	/**
@@ -402,7 +478,7 @@ namespace {
 	 *
 	 * @return WPForms\WPForms
 	 */
-	function wpforms() {
+	function wpforms(): WPForms\WPForms { // phpcs:ignore Universal.Files.SeparateFunctionsFromOO.Mixed
 
 		return WPForms\WPForms::instance();
 	}
@@ -413,7 +489,7 @@ namespace {
 	 * instead of function_exists( 'wpforms' ), which is preferred.
 	 *
 	 * In 1.5.0 we removed support for PHP 5.2
-	 * and moved former WPForms class to a namespace: WPForms\WPForms.
+	 * and moved the former WPForms class to a namespace: WPForms\WPForms.
 	 *
 	 * @since 1.5.1
 	 */

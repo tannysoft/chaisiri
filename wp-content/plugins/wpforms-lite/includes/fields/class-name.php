@@ -1,5 +1,9 @@
 <?php
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 /**
  * Name text field.
  *
@@ -15,16 +19,30 @@ class WPForms_Field_Name extends WPForms_Field {
 	public function init() {
 
 		// Define field type information.
-		$this->name  = esc_html__( 'Name', 'wpforms-lite' );
-		$this->type  = 'name';
-		$this->icon  = 'fa-user';
-		$this->order = 150;
+		$this->name     = esc_html__( 'Name', 'wpforms-lite' );
+		$this->keywords = esc_html__( 'user, first, last', 'wpforms-lite' );
+		$this->type     = 'name';
+		$this->icon     = 'fa-user';
+		$this->order    = 150;
+
+		$this->hooks();
+	}
+
+	/**
+	 * Hooks.
+	 *
+	 * @since 1.8.1
+	 */
+	private function hooks() {
 
 		// Define additional field properties.
-		add_filter( 'wpforms_field_properties_name', array( $this, 'field_properties' ), 5, 3 );
+		add_filter( 'wpforms_field_properties_name', [ $this, 'field_properties' ], 5, 3 );
 
 		// Set field to default to required.
-		add_filter( 'wpforms_field_new_required', array( $this, 'default_required' ), 10, 2 );
+		add_filter( 'wpforms_field_new_required', [ $this, 'default_required' ], 10, 2 );
+
+		// This field requires fieldset+legend instead of the field label.
+		add_filter( "wpforms_frontend_modern_is_field_requires_fieldset_{$this->type}", [ $this, 'is_field_requires_fieldset' ], PHP_INT_MAX, 2 );
 	}
 
 	/**
@@ -55,75 +73,75 @@ class WPForms_Field_Name extends WPForms_Field {
 		unset( $properties['inputs']['primary'] );
 
 		$form_id  = absint( $form_data['id'] );
-		$field_id = absint( $field['id'] );
+		$field_id = wpforms_validate_field_id( $field['id'] );
 
-		$props = array(
-			'inputs' => array(
-				'first'  => array(
-					'attr'     => array(
+		$props = [
+			'inputs' => [
+				'first'  => [
+					'attr'     => [
 						'name'        => "wpforms[fields][{$field_id}][first]",
 						'value'       => ! empty( $field['first_default'] ) ? wpforms_process_smart_tags( $field['first_default'], $form_data ) : '',
 						'placeholder' => ! empty( $field['first_placeholder'] ) ? $field['first_placeholder'] : '',
-					),
-					'block'    => array(
+					],
+					'block'    => [
 						'wpforms-field-row-block',
 						'wpforms-first',
-					),
-					'class'    => array(
+					],
+					'class'    => [
 						'wpforms-field-name-first',
-					),
-					'data'     => array(),
+					],
+					'data'     => [],
 					'id'       => "wpforms-{$form_id}-field_{$field_id}",
 					'required' => ! empty( $field['required'] ) ? 'required' : '',
-					'sublabel' => array(
+					'sublabel' => [
 						'hidden' => ! empty( $field['sublabel_hide'] ),
 						'value'  => esc_html__( 'First', 'wpforms-lite' ),
-					),
-				),
-				'middle' => array(
-					'attr'     => array(
+					],
+				],
+				'middle' => [
+					'attr'     => [
 						'name'        => "wpforms[fields][{$field_id}][middle]",
 						'value'       => ! empty( $field['middle_default'] ) ? wpforms_process_smart_tags( $field['middle_default'], $form_data ) : '',
 						'placeholder' => ! empty( $field['middle_placeholder'] ) ? $field['middle_placeholder'] : '',
-					),
-					'block'    => array(
+					],
+					'block'    => [
 						'wpforms-field-row-block',
 						'wpforms-one-fifth',
-					),
-					'class'    => array(
+					],
+					'class'    => [
 						'wpforms-field-name-middle',
-					),
-					'data'     => array(),
+					],
+					'data'     => [],
 					'id'       => "wpforms-{$form_id}-field_{$field_id}-middle",
 					'required' => '',
-					'sublabel' => array(
+					'sublabel' => [
 						'hidden' => ! empty( $field['sublabel_hide'] ),
 						'value'  => esc_html__( 'Middle', 'wpforms-lite' ),
-					),
-				),
-				'last'   => array(
-					'attr'     => array(
+					],
+				],
+				'last'   => [
+					'attr'     => [
 						'name'        => "wpforms[fields][{$field_id}][last]",
 						'value'       => ! empty( $field['last_default'] ) ? wpforms_process_smart_tags( $field['last_default'], $form_data ) : '',
 						'placeholder' => ! empty( $field['last_placeholder'] ) ? $field['last_placeholder'] : '',
-					),
-					'block'    => array(
+					],
+					'block'    => [
 						'wpforms-field-row-block',
 
-					),
-					'class'    => array(
+					],
+					'class'    => [
 						'wpforms-field-name-last',
-					),
-					'data'     => array(),
+					],
+					'data'     => [],
 					'id'       => "wpforms-{$form_id}-field_{$field_id}-last",
 					'required' => ! empty( $field['required'] ) ? 'required' : '',
-					'sublabel' => array(
+					'sublabel' => [
 						'hidden' => ! empty( $field['sublabel_hide'] ),
 						'value'  => esc_html__( 'Last', 'wpforms-lite' ),
-					),
-				),
-			),
-		);
+					],
+				],
+			],
+		];
 
 		$properties = array_merge_recursive( $properties, $props );
 
@@ -198,9 +216,10 @@ class WPForms_Field_Name extends WPForms_Field {
 		 */
 
 		// Options open markup.
-		$args = array(
+		$args = [
 			'markup' => 'open',
-		);
+		];
+
 		$this->field_option( 'basic-options', $field, $args );
 
 		// Label.
@@ -210,31 +229,34 @@ class WPForms_Field_Name extends WPForms_Field {
 		$lbl = $this->field_element(
 			'label',
 			$field,
-			array(
+			[
 				'slug'    => 'format',
 				'value'   => esc_html__( 'Format', 'wpforms-lite' ),
 				'tooltip' => esc_html__( 'Select format to use for the name form field', 'wpforms-lite' ),
-			),
+			],
 			false
 		);
+
 		$fld = $this->field_element(
 			'select',
 			$field,
-			array(
+			[
 				'slug'    => 'format',
 				'value'   => $format,
-				'options' => array(
+				'options' => [
 					'simple'            => esc_html__( 'Simple', 'wpforms-lite' ),
 					'first-last'        => esc_html__( 'First Last', 'wpforms-lite' ),
 					'first-middle-last' => esc_html__( 'First Middle Last', 'wpforms-lite' ),
-				),
-			),
+				],
+			],
 			false
 		);
-		$args = array(
+
+		$args = [
 			'slug'    => 'format',
 			'content' => $lbl . $fld,
-		);
+		];
+
 		$this->field_element( 'row', $field, $args );
 
 		// Description.
@@ -244,9 +266,10 @@ class WPForms_Field_Name extends WPForms_Field {
 		$this->field_option( 'required', $field );
 
 		// Options close markup.
-		$args = array(
+		$args = [
 			'markup' => 'close',
-		);
+		];
+
 		$this->field_option( 'basic-options', $field, $args );
 
 		/*
@@ -254,9 +277,10 @@ class WPForms_Field_Name extends WPForms_Field {
 		 */
 
 		// Options open markup.
-		$args = array(
+		$args = [
 			'markup' => 'open',
-		);
+		];
+
 		$this->field_option( 'advanced-options', $field, $args );
 
 		// Size.
@@ -268,7 +292,7 @@ class WPForms_Field_Name extends WPForms_Field {
 			$simple_placeholder = ! empty( $field['simple_placeholder'] ) ? esc_attr( $field['simple_placeholder'] ) : '';
 			$simple_default     = ! empty( $field['simple_default'] ) ? esc_attr( $field['simple_default'] ) : '';
 			printf( '<div class="wpforms-clear wpforms-field-option-row wpforms-field-option-row-simple" id="wpforms-field-option-row-%d-simple" data-subfield="simple" data-field-id="%d">', $field['id'], $field['id'] );
-				$this->field_element( 'label', $field, array( 'slug' => 'simple_placeholder', 'value' => esc_html__( 'Name', 'wpforms-lite' ), 'tooltip' => esc_html__( 'Name field advanced options.', 'wpforms-lite' ) ) );
+				$this->field_element( 'label', $field, [ 'slug' => 'simple_placeholder', 'value' => esc_html__( 'Name', 'wpforms-lite' ), 'tooltip' => esc_html__( 'Name field advanced options.', 'wpforms-lite' ) ] );
 				echo '<div class="wpforms-field-options-columns-2 wpforms-field-options-columns">';
 					echo '<div class="placeholder wpforms-field-options-column">';
 						printf( '<input type="text" class="placeholder" id="wpforms-field-option-%d-simple_placeholder" name="fields[%d][simple_placeholder]" value="%s">', (int) $field['id'], (int) $field['id'], esc_attr( $simple_placeholder ) );
@@ -285,7 +309,7 @@ class WPForms_Field_Name extends WPForms_Field {
 			$first_placeholder = ! empty( $field['first_placeholder'] ) ? esc_attr( $field['first_placeholder'] ) : '';
 			$first_default     = ! empty( $field['first_default'] ) ? esc_attr( $field['first_default'] ) : '';
 			printf( '<div class="wpforms-clear wpforms-field-option-row wpforms-field-option-row-first" id="wpforms-field-option-row-%d-first" data-subfield="first-name" data-field-id="%d">', $field['id'], $field['id'] );
-				$this->field_element( 'label', $field, array( 'slug' => 'first_placeholder', 'value' => esc_html__( 'First Name', 'wpforms-lite' ), 'tooltip' => esc_html__( 'First name field advanced options.', 'wpforms-lite' ) ) );
+				$this->field_element( 'label', $field, [ 'slug' => 'first_placeholder', 'value' => esc_html__( 'First Name', 'wpforms-lite' ), 'tooltip' => esc_html__( 'First name field advanced options.', 'wpforms-lite' ) ] );
 				echo '<div class="wpforms-field-options-columns-2 wpforms-field-options-columns">';
 					echo '<div class="placeholder wpforms-field-options-column">';
 						printf( '<input type="text" class="placeholder" id="wpforms-field-option-%1$d-first_placeholder" name="fields[%1$d][first_placeholder]" value="%2$s">', (int) $field['id'], esc_attr( $first_placeholder ) );
@@ -302,7 +326,7 @@ class WPForms_Field_Name extends WPForms_Field {
 			$middle_placeholder = ! empty( $field['middle_placeholder'] ) ? esc_attr( $field['middle_placeholder'] ) : '';
 			$middle_default     = ! empty( $field['middle_default'] ) ? esc_attr( $field['middle_default'] ) : '';
 			printf( '<div class="wpforms-clear wpforms-field-option-row wpforms-field-option-row-middle" id="wpforms-field-option-row-%d-middle" data-subfield="middle-name" data-field-id="%d">', $field['id'], $field['id'] );
-				$this->field_element( 'label', $field, array( 'slug' => 'middle_placeholder', 'value' => esc_html__( 'Middle Name', 'wpforms-lite' ), 'tooltip' => esc_html__( 'Middle name field advanced options.', 'wpforms-lite' ) ) );
+				$this->field_element( 'label', $field, [ 'slug' => 'middle_placeholder', 'value' => esc_html__( 'Middle Name', 'wpforms-lite' ), 'tooltip' => esc_html__( 'Middle name field advanced options.', 'wpforms-lite' ) ] );
 				echo '<div class="wpforms-field-options-columns-2 wpforms-field-options-columns">';
 					echo '<div class="placeholder wpforms-field-options-column">';
 						printf( '<input type="text" class="placeholder" id="wpforms-field-option-%1$d-middle_placeholder" name="fields[%1$d][middle_placeholder]" value="%2$s">', (int) $field['id'], esc_attr( $middle_placeholder ) );
@@ -319,7 +343,7 @@ class WPForms_Field_Name extends WPForms_Field {
 			$last_placeholder = ! empty( $field['last_placeholder'] ) ? esc_attr( $field['last_placeholder'] ) : '';
 			$last_default     = ! empty( $field['last_default'] ) ? esc_attr( $field['last_default'] ) : '';
 			printf( '<div class="wpforms-clear wpforms-field-option-row wpforms-field-option-row-last" id="wpforms-field-option-row-%d-last" data-subfield="last-name" data-field-id="%d">', $field['id'], $field['id'] );
-				$this->field_element( 'label', $field, array( 'slug' => 'last_placeholder', 'value' => esc_html__( 'Last Name', 'wpforms-lite' ), 'tooltip' => esc_html__( 'Last name field advanced options.', 'wpforms-lite' ) ) );
+				$this->field_element( 'label', $field, [ 'slug' => 'last_placeholder', 'value' => esc_html__( 'Last Name', 'wpforms-lite' ), 'tooltip' => esc_html__( 'Last name field advanced options.', 'wpforms-lite' ) ] );
 				echo '<div class="wpforms-field-options-columns-2 wpforms-field-options-columns">';
 					echo '<div class="placeholder wpforms-field-options-column">';
 						printf( '<input type="text" class="placeholder" id="wpforms-field-option-%1$d-last_placeholder" name="fields[%1$d][last_placeholder]" value="%2$s">', (int) $field['id'], esc_attr( $last_placeholder ) );
@@ -487,31 +511,33 @@ class WPForms_Field_Name extends WPForms_Field {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param int   $field_id
-	 * @param array $field_submit
-	 * @param array $form_data
+	 * @param int          $field_id     Field id.
+	 * @param array|string $field_submit Submitted field value (raw data).
+	 * @param array        $form_data    Form data.
 	 */
 	public function validate( $field_id, $field_submit, $form_data ) {
 
-		// Extended validation needed for the different name fields.
-		if ( ! empty( $form_data['fields'][ $field_id ]['required'] ) ) {
-
-			$form_id  = $form_data['id'];
-			$format   = $form_data['fields'][ $field_id ]['format'];
-			$required = wpforms_get_required_label();
-
-			if ( 'simple' === $format && empty( $field_submit ) ) {
-				wpforms()->process->errors[ $form_id ][ $field_id ] = $required;
-			}
-
-			if ( ( 'first-last' === $format || 'first-middle-last' === $format ) && empty( $field_submit['first'] ) ) {
-				wpforms()->process->errors[ $form_id ][ $field_id ]['first'] = $required;
-			}
-
-			if ( ( 'first-last' === $format || 'first-middle-last' === $format ) && empty( $field_submit['last'] ) ) {
-				wpforms()->process->errors[ $form_id ][ $field_id ]['last'] = $required;
-			}
+		if ( empty( $form_data['fields'][ $field_id ]['required'] ) ) {
+			return;
 		}
+
+		// Extended validation needed for the different name fields.
+		$form_id  = $form_data['id'];
+		$format   = $form_data['fields'][ $field_id ]['format'];
+		$required = wpforms_get_required_label();
+		$process  = wpforms()->get( 'process' );
+
+		if ( $format === 'simple' && wpforms_is_empty_string( $field_submit ) ) {
+			$process->errors[ $form_id ][ $field_id ] = $required;
+
+			return;
+		}
+
+		if ( ! ( $format === 'first-last' || $format === 'first-middle-last' ) ) {
+			return;
+		}
+
+		$this->validate_complicated_formats( $process, $form_id, $field_id, $field_submit, $required );
 	}
 
 	/**
@@ -519,34 +545,77 @@ class WPForms_Field_Name extends WPForms_Field {
 	 *
 	 * @since 1.0.0
 	 *
-	 * @param int   $field_id
-	 * @param array $field_submit
-	 * @param array $form_data
+	 * @param int   $field_id     Field ID.
+	 * @param mixed $field_submit Field value that was submitted.
+	 * @param array $form_data    Form data and settings.
 	 */
 	public function format( $field_id, $field_submit, $form_data ) {
-
 		// Define data.
-		$name   = ! empty( $form_data['fields'][ $field_id ]['label'] ) ? $form_data['fields'][ $field_id ]['label'] : '';
-		$first  = ! empty( $field_submit['first'] ) ? $field_submit['first'] : '';
-		$middle = ! empty( $field_submit['middle'] ) ? $field_submit['middle'] : '';
-		$last   = ! empty( $field_submit['last'] ) ? $field_submit['last'] : '';
+		$name   = isset( $form_data['fields'][ $field_id ]['label'] ) && ! wpforms_is_empty_string( $form_data['fields'][ $field_id ]['label'] ) ? $form_data['fields'][ $field_id ]['label'] : '';
+		$first  = isset( $field_submit['first'] ) && ! wpforms_is_empty_string( $field_submit['first'] ) ? $field_submit['first'] : '';
+		$middle = isset( $field_submit['middle'] ) && ! wpforms_is_empty_string( $field_submit['middle'] ) ? $field_submit['middle'] : '';
+		$last   = isset( $field_submit['last'] ) && ! wpforms_is_empty_string( $field_submit['last'] ) ? $field_submit['last'] : '';
 
 		if ( is_array( $field_submit ) ) {
-			$value = implode( ' ', array_filter( array( $first, $middle, $last ) ) );
+			$value = implode( ' ', array_filter( [ $first, $middle, $last ] ) );
 		} else {
 			$value = $field_submit;
 		}
 
 		// Set final field details.
-		wpforms()->process->fields[ $field_id ] = array(
+		wpforms()->get( 'process' )->fields[ $field_id ] = [
 			'name'   => sanitize_text_field( $name ),
 			'value'  => sanitize_text_field( $value ),
-			'id'     => absint( $field_id ),
+			'id'     => wpforms_validate_field_id( $field_id ),
 			'type'   => $this->type,
 			'first'  => sanitize_text_field( $first ),
 			'middle' => sanitize_text_field( $middle ),
 			'last'   => sanitize_text_field( $last ),
-		);
+		];
+	}
+
+	/**
+	 * Determine if the field requires fieldset+legend instead of the regular field label.
+	 *
+	 * @since 1.8.1
+	 *
+	 * @param bool  $requires_fieldset True if requires fieldset.
+	 * @param array $field             Field data.
+	 *
+	 * @return bool
+	 *
+	 * @noinspection PhpUnusedParameterInspection
+	 */
+	public function is_field_requires_fieldset( $requires_fieldset, $field ) {
+
+		return isset( $field['format'] ) && $field['format'] !== 'simple';
+	}
+
+	/**
+	 * Validate complicated formats.
+	 *
+	 * @since 1.8.2.3
+	 *
+	 * @param WPForms_Process $process      Process class instance.
+	 * @param int|string      $form_id      Form id.
+	 * @param int|string      $field_id     Field id.
+	 * @param array           $field_submit Field submit.
+	 * @param string          $required     Required message text.
+	 */
+	private function validate_complicated_formats( $process, $form_id, $field_id, $field_submit, $required ) {
+
+		// Prevent PHP Warning: Illegal string offset ‘first’ or 'last'.
+		if ( isset( $process->errors[ $form_id ][ $field_id ] ) ) {
+			$process->errors[ $form_id ][ $field_id ] = (array) $process->errors[ $form_id ][ $field_id ];
+		}
+
+		if ( isset( $field_submit['first'] ) && wpforms_is_empty_string( $field_submit['first'] ) ) {
+			$process->errors[ $form_id ][ $field_id ]['first'] = $required;
+		}
+
+		if ( isset( $field_submit['last'] ) && wpforms_is_empty_string( $field_submit['last'] ) ) {
+			$process->errors[ $form_id ][ $field_id ]['last'] = $required;
+		}
 	}
 }
 

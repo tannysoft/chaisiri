@@ -71,6 +71,16 @@ class Community {
 			'cover_img2x'    => 'vip-circle@2x.png',
 		];
 
+		$data['announcements'] = [
+			'title'          => esc_html__( 'WPForms Announcements', 'wpforms-lite' ),
+			'description'    => esc_html__( 'Check out the latest releases from WPForms. Our team is always innovating to bring you powerful features and functionality that are simple to use. Every release is designed with you in mind!', 'wpforms-lite' ),
+			'button_text'    => esc_html__( 'View WPForms Announcements', 'wpforms-lite' ),
+			'button_link'    => 'https://wpforms.com/blog/?utm_source=WordPress&amp;utm_medium=Community&amp;utm_campaign=' . esc_attr( $type ) . '&amp;utm_content=Announcements',
+			'cover_bg_color' => '#EFF8E9',
+			'cover_img'      => 'announcements.png',
+			'cover_img2x'    => 'announcements@2x.png',
+		];
+
 		$data['youtube'] = [
 			'title'          => esc_html__( 'WPForms YouTube Channel', 'wpforms-lite' ),
 			'description'    => esc_html__( 'Take a visual dive into everything WPForms has to offer. From simple contact forms to advanced payment forms and email marketing integrations, our extensive video collection covers it all.', 'wpforms-lite' ),
@@ -96,19 +106,9 @@ class Community {
 			'description'    => esc_html__( 'Hang out with other WordPress experts and like minded website owners such as yourself! Hosted by WPBeginner, the largest free WordPress site for beginners.', 'wpforms-lite' ),
 			'button_text'    => esc_html__( 'Join WPBeginner Engage', 'wpforms-lite' ),
 			'button_link'    => 'https://www.facebook.com/groups/wpbeginner/',
-			'cover_bg_color' => '#FCEBDF',
+			'cover_bg_color' => '#FCEDE4',
 			'cover_img'      => 'wpbeginner.png',
 			'cover_img2x'    => 'wpbeginner@2x.png',
-		];
-
-		$data['translators'] = [
-			'title'          => esc_html__( 'WPForms Translators Community', 'wpforms-lite' ),
-			'description'    => esc_html__( 'We\'re building a community of translators and i18n experts to translate WPForms. Sign up to our translator community newsletter to learn more and get information on how you can contribute!', 'wpforms-lite' ),
-			'button_text'    => esc_html__( 'Join Translators Community', 'wpforms-lite' ),
-			'button_link'    => 'https://wpforms.com/translator-community-signup/?utm_source=WordPress&amp;utm_medium=Community&amp;utm_campaign=' . esc_attr( $type ) . '&amp;utm_content=Translators',
-			'cover_bg_color' => '#F2FAED',
-			'cover_img'      => 'translators.png',
-			'cover_img2x'    => 'translators@2x.png',
 		];
 
 		$data['suggest'] = [
@@ -145,7 +145,7 @@ class Community {
 							<h3 class="item-title">%s</h3>
 							<p class="item-description">%s</p>
 							<div class="item-footer">
-								<a class="button-primary" href="%s" target="_blank" rel="noopener noreferrer">%s</a>
+								<a class="wpforms-btn button-primary wpforms-btn-blue" href="%s" target="_blank" rel="noopener noreferrer">%s</a>
 							</div>
 						</div>',
 						esc_attr( $item['cover_bg_color'] ),

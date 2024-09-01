@@ -1,7 +1,24 @@
 <?php
+/**
+ * WPForms_Lite class file.
+ */
 
-use WPForms\Lite\Integrations\LiteConnect\LiteConnect;
+// phpcs:disable Generic.Commenting.DocComment.MissingShort
+/** @noinspection PhpIllegalPsrClassPathInspection */
+/** @noinspection AutoloadingIssuesInspection */
+// phpcs:enable Generic.Commenting.DocComment.MissingShort
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+use WPForms\Admin\Builder\TemplatesCache;
+use WPForms\Db\Payments\Meta as PaymentsMeta;
+use WPForms\Db\Payments\Payment;
 use WPForms\Lite\Integrations\LiteConnect\Integration as LiteConnectIntegration;
+use WPForms\Lite\Integrations\LiteConnect\LiteConnect;
+use WPForms\Logger\Repository;
+use WPForms\Tasks\Meta as TasksMeta;
 
 /**
  * WPForms Lite. Load Lite-specific features/functionality.
@@ -11,16 +28,36 @@ use WPForms\Lite\Integrations\LiteConnect\Integration as LiteConnectIntegration;
 class WPForms_Lite {
 
 	/**
+	 * Custom tables and their handlers.
+	 *
+	 * @since 1.9.0
+	 */
+	const CUSTOM_TABLES = [
+		'wpforms_payments'     => Payment::class,
+		'wpforms_payment_meta' => PaymentsMeta::class,
+		'wpforms_tasks_meta'   => TasksMeta::class,
+		'wpforms_logs'         => Repository::class,
+	];
+
+	/**
 	 * Primary class constructor.
 	 *
 	 * @since 1.2.2
 	 */
 	public function __construct() {
 
-		$this->includes();
+		$this->hooks();
+	}
+
+	/**
+	 * Register hooks.
+	 *
+	 * @since 1.8.9
+	 */
+	private function hooks() {
 
 		add_action( 'wpforms_install', [ $this, 'install' ] );
-		add_action( 'wpforms_form_settings_notifications', [ $this, 'form_settings_notifications' ], 8, 1 );
+		add_action( 'wpforms_form_settings_notifications', [ $this, 'form_settings_notifications' ], 8 );
 		add_action( 'wpforms_form_settings_confirmations', [ $this, 'form_settings_confirmations' ] );
 		add_action( 'wpforms_builder_enqueues_before', [ $this, 'builder_enqueues' ] );
 		add_action( 'wpforms_admin_page', [ $this, 'entries_page' ] );
@@ -30,19 +67,11 @@ class WPForms_Lite {
 		add_filter( 'wpforms_helpers_templates_get_theme_template_paths', [ $this, 'add_templates' ] );
 
 		// Entries count logging for WPForms Lite.
-		add_action( 'wpforms_process_entry_save', [ $this, 'entry_submit' ], 10, 4 );
-		add_action( 'wpforms_process_entry_save', [ $this, 'update_entry_count' ], 10, 3 );
+		add_action( 'wpforms_process_entry_saved', [ $this, 'entry_submit' ], 10, 5 );
+		add_action( 'wpforms_process_entry_saved', [ $this, 'update_entry_count' ], 10, 5 );
 
 		// Upgrade to Pro WPForms menu bar item.
 		add_action( 'admin_bar_menu', [ $this, 'upgrade_to_pro_menu' ], 1000 );
-	}
-
-	/**
-	 * Include files.
-	 *
-	 * @since 1.0.0
-	 */
-	private function includes() {
 	}
 
 	/**
@@ -50,11 +79,13 @@ class WPForms_Lite {
 	 *
 	 * @since 1.2.3
 	 *
-	 * @param object $settings
+	 * @param object $settings Settings.
+	 *
+	 * @noinspection HtmlUnknownTarget
 	 */
-	public function form_settings_notifications( $settings ) {
+	public function form_settings_notifications( $settings ) { // phpcs:ignore Generic.Metrics.CyclomaticComplexity.TooHigh
 
-		$cc         = wpforms_setting( 'email-carbon-copy', false );
+		$cc         = wpforms_setting( 'email-carbon-copy' );
 		$from_email = '{admin_email}';
 		$from_name  = sanitize_text_field( get_option( 'blogname' ) );
 
@@ -86,8 +117,12 @@ class WPForms_Lite {
 
 		// Handle backwards compatibility.
 		if ( empty( $settings->form_data['settings']['notifications'] ) ) {
-			/* translators: %s - form name. */
-			$settings->form_data['settings']['notifications'][1]['subject']        = ! empty( $settings->form_data['settings']['notification_subject'] ) ? $settings->form_data['settings']['notification_subject'] : sprintf( esc_html__( 'New %s Entry', 'wpforms-lite' ), $settings->form->post_title );
+			$settings->form_data['settings']['notifications'][1]['subject']        = ! empty( $settings->form_data['settings']['notification_subject'] ) ?
+				$settings->form_data['settings']['notification_subject'] :
+				sprintf( /* translators: %s - form name. */
+					esc_html__( 'New %s Entry', 'wpforms-lite' ),
+					$settings->form->post_title
+				);
 			$settings->form_data['settings']['notifications'][1]['email']          = ! empty( $settings->form_data['settings']['notification_email'] ) ? $settings->form_data['settings']['notification_email'] : '{admin_email}';
 			$settings->form_data['settings']['notifications'][1]['sender_name']    = ! empty( $settings->form_data['settings']['notification_fromname'] ) ? $settings->form_data['settings']['notification_fromname'] : $from_name;
 			$settings->form_data['settings']['notifications'][1]['sender_address'] = ! empty( $settings->form_data['settings']['notification_fromaddress'] ) ? $settings->form_data['settings']['notification_fromaddress'] : $from_email;
@@ -114,7 +149,7 @@ class WPForms_Lite {
 			echo '<button type="button" class="wpforms-dismiss-button" title="' . esc_attr__( 'Dismiss this message.', 'wpforms-lite' ) . '" data-section="builder-notifications-description"></button>';
 			echo '<p>';
 			printf(
-				wp_kses( /* translators: %s - Link to the WPForms.com doc article. */
+				wp_kses( /* translators: %s - link to the WPForms.com doc article. */
 					__( 'Notifications are emails sent when a form is submitted. By default, these emails include entry details. For setup and customization options, including a video overview, please <a href="%s" target="_blank" rel="noopener noreferrer">see our tutorial</a>.', 'wpforms-lite' ),
 					[
 						'a' => [
@@ -129,7 +164,7 @@ class WPForms_Lite {
 			echo '</p>';
 			echo '<p>';
 			printf(
-				wp_kses( /* translators: 1$s, %2$s - Links to the WPForms.com doc articles. */
+				wp_kses( /* translators: 1$s, %2$s - links to the WPForms.com doc articles. */
 					__( 'After saving these settings, be sure to <a href="%1$s" target="_blank" rel="noopener noreferrer">test a form submission</a>. This lets you see how emails will look, and to ensure that they <a href="%2$s" target="_blank" rel="noopener noreferrer">are delivered successfully</a>.', 'wpforms-lite' ),
 					[
 						'a'  => [
@@ -207,8 +242,10 @@ class WPForms_Lite {
 					$settings->form_data,
 					esc_html__( 'Email Subject Line', 'wpforms-lite' ),
 					[
-						/* translators: %s - form name. */
-						'default'    => sprintf( esc_html__( 'New Entry: %s', 'wpforms-lite' ), $settings->form->post_title ),
+						'default'    => sprintf( /* translators: %s - form name. */
+							esc_html__( 'New Entry: %s', 'wpforms-lite' ),
+							$settings->form->post_title
+						),
 						'smarttags'  => [
 							'type' => 'all',
 						],
@@ -242,14 +279,11 @@ class WPForms_Lite {
 							],
 							'parent'     => 'settings',
 							'subsection' => $id,
-							'readonly'   => ! empty( $from_name_after ),
-							'after'      => ! empty( $from_name_after ) ? '<div class="wpforms-alert wpforms-alert-warning">' . $from_name_after . '</div>' : '',
-							'class'      => ! empty( $from_name_after ) ? 'wpforms-panel-field-warnings' : '',
 						],
 						$settings->form_data,
 						$id
 					)
-					// phpcs:enable WPForms.PHP.ValidateHooks.InvalidHookName
+				// phpcs:enable WPForms.PHP.ValidateHooks.InvalidHookName
 				);
 				wpforms_panel_field(
 					'text',
@@ -277,9 +311,6 @@ class WPForms_Lite {
 							],
 							'parent'     => 'settings',
 							'subsection' => $id,
-							'readonly'   => ! empty( $from_email_after ),
-							'after'      => ! empty( $from_email_after ) ? '<div class="wpforms-alert wpforms-alert-warning">' . $from_email_after . '</div>' : '',
-							'class'      => ! empty( $from_email_after ) ? 'wpforms-panel-field-warning' : '',
 						],
 						$settings->form_data,
 						$id
@@ -335,7 +366,7 @@ class WPForms_Lite {
 				);
 
 				/**
-				 * Fires immediately after notification block on lite version.
+				 * Fires after notification block content on the lite version.
 				 *
 				 * @since 1.7.7
 				 *
@@ -348,7 +379,15 @@ class WPForms_Lite {
 		</div>
 
 		<?php
-		do_action( 'wpforms_builder_settings_notifications_after', 'notifications', $settings );
+		/**
+		 * Fires after settings notification block.
+		 *
+		 * @since 1.5.8
+		 *
+		 * @param string $type     Settings block type.
+		 * @param array  $settings Settings.
+		 */
+		do_action( 'wpforms_builder_settings_notifications_after', 'notifications', $settings ); // phpcs:ignore WPForms.PHP.ValidateHooks.InvalidHookName
 
 		// phpcs:disable WPForms.PHP.ValidateHooks.InvalidHookName
 
@@ -382,8 +421,39 @@ class WPForms_Lite {
 		wp_enqueue_style(
 			'wpforms-lite-admin',
 			WPFORMS_PLUGIN_URL . "assets/lite/css/admin{$min}.css",
-			array(),
+			[],
 			WPFORMS_VERSION
+		);
+
+		// Entries assets.
+		wp_register_style(
+			'wpforms-admin-entry-list',
+			WPFORMS_PLUGIN_URL . "assets/lite/css/admin/entries/entry-list{$min}.css",
+			[],
+			WPFORMS_VERSION
+		);
+
+		wp_register_script(
+			'wpforms-admin-entry-list',
+			WPFORMS_PLUGIN_URL . "assets/lite/js/admin/entries/entry-list{$min}.js",
+			[ 'jquery' ],
+			WPFORMS_VERSION,
+			true
+		);
+
+		wp_register_style(
+			'wpforms-admin-view-entry',
+			WPFORMS_PLUGIN_URL . "assets/lite/css/admin/entries/view-entry{$min}.css",
+			[],
+			WPFORMS_VERSION
+		);
+
+		wp_register_script(
+			'wpforms-admin-view-entry',
+			WPFORMS_PLUGIN_URL . "assets/lite/js/admin/entries/view-entry{$min}.js",
+			[ 'jquery' ],
+			WPFORMS_VERSION,
+			true
 		);
 	}
 
@@ -394,7 +464,7 @@ class WPForms_Lite {
 	 *
 	 * @param WPForms_Builder_Panel_Settings $settings Builder panel settings.
 	 */
-	public function form_settings_confirmations( $settings ) {
+	public function form_settings_confirmations( $settings ) { // phpcs:ignore Generic.Metrics.CyclomaticComplexity.TooHigh
 
 		wp_enqueue_editor();
 
@@ -497,7 +567,7 @@ class WPForms_Lite {
 					$settings->form_data,
 					esc_html__( 'Confirmation Page', 'wpforms-lite' ),
 					[
-						'class'       => 'wpforms-panel-field-confirmations-page-choicesjs-unflippable',
+						'class'       => 'wpforms-panel-field-confirmations-page-choicesjs',
 						'options'     => wpforms_builder_form_settings_confirmation_get_pages( $settings->form_data, $field_id ),
 						'input_class' => 'wpforms-panel-field-confirmations-page',
 						'parent'      => 'settings',
@@ -535,13 +605,23 @@ class WPForms_Lite {
 		</div>
 
 		<?php
-		do_action( 'wpforms_builder_settings_confirmations_after', 'confirmations', $settings );
+		/**
+		 * Fires after builder settings confirmation block.
+		 *
+		 * @since 1.5.8
+		 *
+		 * @param string $type     Settings block type.
+		 * @param array  $settings Settings.
+		 */
+		do_action( 'wpforms_builder_settings_confirmations_after', 'confirmations', $settings ); // phpcs:ignore WPForms.PHP.ValidateHooks.InvalidHookName
 	}
 
 	/**
-	 * Load assets for lite version with the admin builder.
+	 * Load assets for the lite version with the admin builder.
 	 *
 	 * @since 1.0.0
+	 *
+	 * @noinspection HtmlUnknownTarget
 	 */
 	public function builder_enqueues() {
 
@@ -549,7 +629,7 @@ class WPForms_Lite {
 
 		wp_enqueue_script(
 			'wpforms-builder-lite',
-			WPFORMS_PLUGIN_URL . "assets/lite/js/admin-builder-lite{$min}.js",
+			WPFORMS_PLUGIN_URL . "assets/lite/js/admin/builder/admin-builder-lite{$min}.js",
 			[ 'jquery', 'jquery-confirm' ],
 			WPFORMS_VERSION,
 			false
@@ -567,7 +647,7 @@ class WPForms_Lite {
 						],
 					]
 				),
-				'https://wpforms.com/docs/setup-form-notification-wpforms/'
+				esc_url( wpforms_utm_link( 'https://wpforms.com/docs/setup-form-notification-wpforms/', 'Builder Notifications', 'Disable Notifications Alert' ) )
 			),
 		];
 
@@ -601,7 +681,7 @@ class WPForms_Lite {
 				<?php
 				printf(
 					wp_kses( /* translators: %s - star icons. */
-						__( 'We know that you will truly love WPForms. It has over 11,000+ five star ratings (%s) and is active on over 5 million websites.', 'wpforms-lite' ),
+						__( 'We know that you will truly love WPForms. It has over 13,000+ five star ratings (%s) and is active on over 6 million websites.', 'wpforms-lite' ),
 						[
 							'i' => [
 								'class'       => [],
@@ -616,22 +696,32 @@ class WPForms_Lite {
 			<h6><?php esc_html_e( 'Pro Features:', 'wpforms-lite' ); ?></h6>
 			<div class="list">
 				<ul>
-					<li><?php esc_html_e( '500+ customizable form templates', 'wpforms-lite' ); ?></li>
+					<li>
+						<?php
+						printf( /* translators: %s - number of templates. */
+							esc_html__( '%s customizable form templates', 'wpforms-lite' ),
+							'1800+'
+						);
+						?>
+					</li>
 					<li><?php esc_html_e( 'Store and manage form entries in WordPress', 'wpforms-lite' ); ?></li>
-					<li><?php esc_html_e( 'Unlock all fields & features, including Rich Text & conditional logic', 'wpforms-lite' ); ?></li>
-					<li><?php esc_html_e( 'Make Surveys and Polls and create reports', 'wpforms-lite' ); ?></li>
+					<li><?php esc_html_e( 'Unlock all fields & features, including smart conditional logic', 'wpforms-lite' ); ?></li>
+					<li><?php esc_html_e( 'Create powerful custom calculation forms', 'wpforms-lite' ); ?></li>
+					<li><?php esc_html_e( 'Make surveys and generate reports', 'wpforms-lite' ); ?></li>
 					<li><?php esc_html_e( 'Accept user-submitted content with the Post Submissions addon', 'wpforms-lite' ); ?></li>
 				</ul>
 				<ul>
-					<li><?php esc_html_e( '5000+ integrations with marketing and payment services', 'wpforms-lite' ); ?></li>
-					<li><?php esc_html_e( 'Let users Save and Resume submissions to prevent abandonment', 'wpforms-lite' ); ?></li>
-					<li><?php esc_html_e( 'Take payments with PayPal Commerce, Stripe, Square, Authorize.Net, and PayPal Standard', 'wpforms-lite' ); ?></li>
+					<li><?php esc_html_e( '7000+ integrations with marketing and payment services', 'wpforms-lite' ); ?></li>
+					<li><?php esc_html_e( 'Let users save & resume submissions to prevent abandonment', 'wpforms-lite' ); ?></li>
+					<li><?php esc_html_e( 'Take payments with Stripe, PayPal, Square, & Authorize.Net', 'wpforms-lite' ); ?></li>
+					<li><?php esc_html_e( 'Export entries to Google Sheets, Excel, and CSV', 'wpforms-lite' ); ?></li>
 					<li><?php esc_html_e( 'Collect signatures, geolocation data, and file uploads', 'wpforms-lite' ); ?></li>
 					<li><?php esc_html_e( 'Create user registration and login forms', 'wpforms-lite' ); ?></li>
 				</ul>
 			</div>
 			<p>
-				<a href="<?php echo esc_url( wpforms_admin_upgrade_link( 'settings-upgrade' ) ); ?>" target="_blank" rel="noopener noreferrer">
+				<?php $utm_content = ucwords( $view ) . ' Tab'; ?>
+				<a href="<?php echo esc_url( wpforms_admin_upgrade_link( 'settings-upgrade', $utm_content ) ); ?>" target="_blank" rel="noopener noreferrer">
 					<?php esc_html_e( 'Get WPForms Pro Today and Unlock all the Powerful Features »', 'wpforms-lite' ); ?>
 				</a>
 			</p>
@@ -680,523 +770,67 @@ class WPForms_Lite {
 	}
 
 	/**
-	 * Notify user that entries is a pro feature.
+	 * Display sample data and notify user that entries is a pro feature.
 	 *
 	 * @since 1.0.0
 	 */
 	public function entries_page() {
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( ! isset( $_GET['page'] ) || $_GET['page'] !== 'wpforms-entries' ) {
+		if ( wpforms_is_admin_page( 'entries', 'sample' ) ) {
+			$this->entry_single_page();
+
 			return;
 		}
 
+		if ( wpforms_is_admin_page( 'entries' ) ) {
+			$this->entries_list_page();
+		}
+	}
+
+	/**
+	 * Display the Entries List page with sample data.
+	 *
+	 * @since 1.8.9
+	 */
+	private function entries_list_page() {
+
 		$is_lite_connect_enabled = LiteConnect::is_enabled();
 		$is_lite_connect_allowed = LiteConnect::is_allowed();
-		?>
 
-		<style>
-			.wpforms-admin-content {
-				-webkit-filter: blur(3px);
-				-moz-filter: blur(3px);
-				-ms-filter: blur(3px);
-				-o-filter: blur(3px);
-				filter: blur(3px);
-			}
+		wp_enqueue_style( 'wpforms-admin-entry-list' );
+		wp_enqueue_script( 'wpforms-admin-entry-list' );
 
-			.wpforms-admin-content a {
-				pointer-events: none;
-				cursor: default;
-			}
+		echo wpforms_render( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			'admin/entries/overview/entry-list',
+			[
+				'is_lite_connect_enabled' => $is_lite_connect_enabled,
+				'is_lite_connect_allowed' => $is_lite_connect_allowed,
+				'entries_count'           => LiteConnectIntegration::get_new_entries_count(),
+				'enabled_since'           => LiteConnectIntegration::get_enabled_since(),
+				'sample_entries'          => $this->get_entries_list_data(),
+				'utm'                     => $this->get_entries_utm(),
+			],
+			true
+		);
+	}
 
-			.ie-detected {
-				position: absolute;
-				top: 0;
-				width: 100%;
-				height: 100%;
-				left: 0;
-				background-color: #f1f1f1;
-				opacity: 0.65;
-				z-index: 10;
-			}
+	/**
+	 * Display the Single Entry page with sample data.
+	 *
+	 * @since 1.8.9
+	 */
+	private function entry_single_page() {
 
-			.wpforms-admin-content,
-			.wpforms-admin-content-wrap {
-				position: relative;
-			}
+		wp_enqueue_style( 'wpforms-admin-view-entry' );
+		wp_enqueue_script( 'wpforms-admin-view-entry' );
 
-			.entries-modal {
-				text-align: center;
-				width: 730px;
-				box-shadow: 0 0 60px 30px rgba(0, 0, 0, 0.15);
-				border-radius: 6px;
-				position: absolute;
-				top: 75px;
-				left: 50%;
-				margin: 0 auto 0 -365px;
-				z-index: 100;
-				overflow: hidden;
-			}
-
-			.entries-modal *,
-			.entries-modal *::before,
-			.entries-modal *::after {
-				-webkit-box-sizing: border-box;
-				-moz-box-sizing: border-box;
-				box-sizing: border-box;
-			}
-
-			.entries-modal h2 {
-				font-size: 20px;
-				margin: 0 0 16px 0;
-				padding: 0;
-			}
-
-			.entries-modal p {
-				font-size: 16px;
-				line-height: 24px;
-				color: #777777;
-				margin: 0 0 30px 0;
-				padding: 0;
-			}
-
-			.entries-modal-content-top-notice {
-				padding: 10px;
-				text-align: center;
-				font-style: normal;
-				font-weight: normal;
-				font-size: 15px;
-				line-height: 24px;
-				color: #444444;
-				background: #fcf9e8;
-			}
-
-			.entries-modal-content-top-notice .wpforms-icon {
-				width: 18px;
-				height: 16px;
-				background-image: url('<?php echo esc_url( WPFORMS_PLUGIN_URL ); ?>assets/images/exclamation-triangle-orange.svg');
-				background-repeat: no-repeat;
-				background-size: 18px 16px;
-				display: inline-block;
-				margin-right: 10px;
-				vertical-align: -2px;
-			}
-
-			.entries-modal-content {
-				background-color: #ffffff;
-				border-radius: 3px 3px 0 0;
-				padding: 40px;
-			}
-
-			.entries-modal ul {
-				float: left;
-				width: 50%;
-				margin: 0;
-				padding: 0 0 0 30px;
-				text-align: left;
-			}
-
-			.entries-modal li {
-				color: #777777;
-				font-size: 16px;
-				line-height: 19px;
-				padding: 6px 0;
-			}
-
-			.entries-modal li .fa {
-				color: #2a9b39;
-				margin: 0 8px 0 0;
-			}
-
-			.entries-modal-button {
-				border-radius: 0 0 3px 3px;
-				padding: 30px;
-				background: #f5f5f5;
-				text-align: center;
-			}
-
-			.entries-modal-button p {
-				margin: 20px 0 0 0;
-				font-size: 15px;
-				line-height: 18px;
-				text-align: center;
-			}
-
-			.entries-modal-button p span {
-				display: inline-block;
-				margin-left: 20px;
-				vertical-align: bottom;
-				font-size: 14px;
-				line-height: 17px;
-			}
-
-			.entries-modal-button p .wpforms-toggle-control .wpforms-toggle-control-label {
-				max-width: none;
-			}
-
-			.entries-modal-button .entries-modal-button-before {
-				line-height: 24px;
-				margin: 0 0 20px 0;
-				color: #444444;
-			}
-
-			#wpforms-entries-list .entries .column-indicators > a {
-				float: left;
-			}
-		</style>
-
-		<script type="text/javascript">
-			jQuery( function ( $ ) {
-				var userAgent = window.navigator.userAgent,
-					onlyIEorEdge = /msie\s|trident\/|edge\//i.test( userAgent ) && ! ! (document.uniqueID || window.MSInputMethodContext),
-					checkVersion = (onlyIEorEdge && + (/(edge\/|rv:|msie\s)([\d.]+)/i.exec( userAgent )[ 2 ])) || NaN;
-				if ( ! isNaN( checkVersion ) ) {
-					$( '#ie-wrap' ).addClass( 'ie-detected' );
-				}
-			} );
-		</script>
-
-		<div id="wpforms-entries-list" class="wrap wpforms-admin-wrap">
-			<h1 class="page-title">Entries</h1>
-			<div class="wpforms-admin-content-wrap">
-
-				<div class="entries-modal">
-					<?php if ( ! $is_lite_connect_enabled ) : ?>
-						<div class="entries-modal-content-top-notice">
-							<i class="wpforms-icon"></i><?php esc_html_e( 'Form entries are not stored in WPForms Lite.', 'wpforms-lite' ); ?>
-						</div>
-					<?php endif; ?>
-					<div class="entries-modal-content">
-						<h2>
-							<?php esc_html_e( 'View and Manage Your Form Entries inside WordPress', 'wpforms-lite' ); ?>
-						</h2>
-						<p>
-							<?php esc_html_e( 'Once you upgrade to WPForms Pro, all future form entries will be stored in your WordPress database and displayed on this Entries screen.', 'wpforms-lite' ); ?>
-						</p>
-						<div class="wpforms-clear">
-							<ul class="left">
-								<li><i class="fa fa-check" aria-hidden="true"></i> <?php esc_html_e( 'View Entries in Dashboard', 'wpforms-lite' ); ?></li>
-								<li><i class="fa fa-check" aria-hidden="true"></i> <?php esc_html_e( 'Export Entries in a CSV File', 'wpforms-lite' ); ?></li>
-								<li><i class="fa fa-check" aria-hidden="true"></i> <?php esc_html_e( 'Add Notes / Comments', 'wpforms-lite' ); ?></li>
-								<li><i class="fa fa-check" aria-hidden="true"></i> <?php esc_html_e( 'Save Favorite Entries', 'wpforms-lite' ); ?></li>
-							</ul>
-							<ul class="right">
-								<li><i class="fa fa-check" aria-hidden="true"></i> <?php esc_html_e( 'Mark Read / Unread', 'wpforms-lite' ); ?></li>
-								<li><i class="fa fa-check" aria-hidden="true"></i> <?php esc_html_e( 'Print Entries', 'wpforms-lite' ); ?></li>
-								<li><i class="fa fa-check" aria-hidden="true"></i> <?php esc_html_e( 'Resend Notifications', 'wpforms-lite' ); ?></li>
-								<li><i class="fa fa-check" aria-hidden="true"></i> <?php esc_html_e( 'See Geolocation Data', 'wpforms-lite' ); ?></li>
-							</ul>
-						</div>
-					</div>
-					<div class="entries-modal-button">
-						<?php if ( $is_lite_connect_enabled && $is_lite_connect_allowed ) : ?>
-
-							<p class="entries-modal-button-before">
-							<?php
-								$entries_count = LiteConnectIntegration::get_new_entries_count();
-								$enabled_since = LiteConnectIntegration::get_enabled_since();
-
-								printf(
-									'<strong>' . esc_html( /* translators: %d - Backed up entries count. */
-										_n(
-											'%d entry has been backed up',
-											'%d entries have been backed up',
-											$entries_count,
-											'wpforms-lite'
-										)
-									) . '</strong>',
-									absint( $entries_count )
-								);
-
-								if ( ! empty( $enabled_since ) ) {
-									echo ' ';
-									printf(
-										/* translators: %s - Time when Lite Connect was enabled. */
-										esc_html__( 'since you enabled Lite Connect on %s', 'wpforms-lite' ),
-										esc_html( date_i18n( 'M j, Y', $enabled_since + get_option( 'gmt_offset' ) * 3600 ) )
-									);
-								}
-							// phpcs:ignore Squiz.PHP.EmbeddedPhp.ContentAfterEnd
-							?>.</p>
-							<a href="<?php echo esc_url( wpforms_admin_upgrade_link( 'entries' ) ); ?>" class="wpforms-btn wpforms-btn-lg wpforms-btn-orange wpforms-upgrade-modal" target="_blank" rel="noopener noreferrer">
-								<?php esc_html_e( 'Upgrade to WPForms Pro & Restore Form Entries', 'wpforms-lite' ); ?>
-							</a>
-
-						<?php else : ?>
-
-							<a href="<?php echo esc_url( wpforms_admin_upgrade_link( 'entries' ) ); ?>" class="wpforms-btn wpforms-btn-lg wpforms-btn-orange wpforms-upgrade-modal" target="_blank" rel="noopener noreferrer">
-								<?php esc_html_e( 'Upgrade to WPForms Pro Now', 'wpforms-lite' ); ?>
-							</a>
-
-						<?php endif; ?>
-					</div>
-				</div>
-
-				<div class="wpforms-admin-content">
-					<div id="ie-wrap"></div>
-					<div class="form-details wpforms-clear">
-						<span class="form-details-sub">Select Form</span>
-						<h3 class="form-details-title">
-							Contact Us
-							<div class="form-selector">
-								<a href="#" title="Open form selector" class="toggle dashicons dashicons-arrow-down-alt2"></a>
-								<div class="form-list" style="display: none;">
-									<ul>
-										<li></li>
-									</ul>
-								</div>
-							</div>
-						</h3>
-						<div class="form-details-actions">
-							<a href="#" class="form-details-actions-edit"><span class="dashicons dashicons-edit"></span> Edit This Form</a>
-							<a href="#" class="form-details-actions-preview" target="_blank" rel="noopener noreferrer"><span class="dashicons dashicons-visibility"></span> Preview Form</a>
-							<a href="#" class="form-details-actions-export"><span class="dashicons dashicons-migrate"></span> Export All (CSV)</a>
-							<a href="#" class="form-details-actions-read"><span class="dashicons dashicons-marker"></span> Mark All Read</a>
-						</div>
-					</div>
-					<form id="wpforms-entries-table">
-						<ul class="subsubsub">
-							<li class="all"><a href="#" class="current">All&nbsp;<span class="count">(<span class="total-num">10</span>)</span></a> |</li>
-							<li class="unread"><a href="#">Unread&nbsp;<span class="count">(<span class="unread-num">10</span>)</span></a> |</li>
-							<li class="starred"><a href="#">Starred&nbsp;<span class="count">(<span class="starred-num">0</span>)</span></a></li>
-						</ul>
-						<div class="tablenav top">
-							<div class="alignleft actions bulkactions">
-								<label for="bulk-action-selector-top" class="screen-reader-text">Select bulk action</label>
-								<select name="action" id="bulk-action-selector-top">
-									<option value="-1">Bulk Actions</option>
-								</select>
-								<input type="submit" id="doaction" class="button action" value="Apply">
-							</div>
-							<div class="tablenav-pages one-page">
-								<span class="displaying-num">10 items</span>
-								<span class="pagination-links">
-									<span class="tablenav-pages-navspan" aria-hidden="true">«</span>
-									<span class="tablenav-pages-navspan" aria-hidden="true">‹</span>
-									<span class="paging-input">
-										<label for="current-page-selector" class="screen-reader-text">Current Page</label>
-										<input class="current-page" id="current-page-selector" type="text" name="paged" value="1" size="1" aria-describedby="table-paging">
-										<span class="tablenav-paging-text"> of <span class="total-pages">1</span></span>
-									</span>
-									<span class="tablenav-pages-navspan" aria-hidden="true">›</span>
-									<span class="tablenav-pages-navspan" aria-hidden="true">»</span>
-								</span>
-							</div>
-							<br class="clear">
-						</div>
-						<table class="wp-list-table widefat fixed striped entries">
-							<thead>
-								<tr>
-									<td id="cb" class="manage-column column-cb check-column">
-										<label class="screen-reader-text" for="cb-select-all-1">Select All</label>
-										<input id="cb-select-all-1" type="checkbox">
-									</td>
-									<th scope="col" id="indicators" class="manage-column column-indicators column-primary"></th>
-									<th scope="col" id="wpforms_field_0" class="manage-column column-wpforms_field_0">Name</th>
-									<th scope="col" id="wpforms_field_1" class="manage-column column-wpforms_field_1">Email</th>
-									<th scope="col" id="wpforms_field_2" class="manage-column column-wpforms_field_2">Comment or Message</th>
-									<th scope="col" id="date" class="manage-column column-date sortable desc">
-										<a href="#"><span>Date</span><span class="sorting-indicator"></span></a>
-									</th>
-									<th scope="col" id="actions" class="manage-column column-actions">Actions</th>
-								</tr>
-							</thead>
-							<tbody id="the-list" data-wp-lists="list:entry">
-								<tr>
-									<th scope="row" class="check-column"><input type="checkbox" name="entry_id[]" value="1088"></th>
-									<td class="indicators column-indicators has-row-actions column-primary" data-colname="">
-										<a href="#" class="indicator-star star" data-id="1088" title="Star entry"><span class="dashicons dashicons-star-filled"></span></a>
-										<a href="#" class="indicator-read read" data-id="1088" title="Mark entry read"><span class="dashicons dashicons-marker"></span></a>
-										<button type="button" class="toggle-row"><span class="screen-reader-text">Show more details</span></button>
-									</td>
-									<td class="wpforms_field_0 column-wpforms_field_0" data-colname="Name">David Wells</td>
-									<td class="wpforms_field_1 column-wpforms_field_1" data-colname="Email">DavidMWells@example.com</td>
-									<td class="wpforms_field_2 column-wpforms_field_2" data-colname="Comment or Message">
-										Vivamus sit amet dolor arcu. Praesent fermentum semper justo, nec scelerisq…
-									</td>
-									<td class="date column-date" data-colname="Date">July 27, 2017</td>
-									<td class="actions column-actions" data-colname="Actions">
-										<a href="#" title="View Form Entry" class="view">View</a> <span class="sep">|</span> <a href="#" title="Delete Form Entry" class="delete">Delete</a>
-									</td>
-								</tr>
-								<tr>
-									<th scope="row" class="check-column"><input type="checkbox" name="entry_id[]" value="1087"></th>
-									<td class="indicators column-indicators has-row-actions column-primary" data-colname="">
-										<a href="#" class="indicator-star star" data-id="1087" title="Star entry"><span class="dashicons dashicons-star-filled"></span></a>
-										<a href="#" class="indicator-read read" data-id="1087" title="Mark entry read"><span class="dashicons dashicons-marker"></span></a>
-										<button type="button" class="toggle-row"><span class="screen-reader-text">Show more details</span></button>
-									</td>
-									<td class="wpforms_field_0 column-wpforms_field_0" data-colname="Name">Jennifer Selzer</td>
-									<td class="wpforms_field_1 column-wpforms_field_1" data-colname="Email">JenniferLSelzer@example.com</td>
-									<td class="wpforms_field_2 column-wpforms_field_2" data-colname="Comment or Message">
-										Maecenas sollicitudin felis et justo elementum, et lobortis justo vulputate…
-									</td>
-									<td class="date column-date" data-colname="Date">July 27, 2017</td>
-									<td class="actions column-actions" data-colname="Actions">
-										<a href="#" title="View Form Entry" class="view">View</a> <span	class="sep">|</span> <a href="#" title="Delete Form Entry" class="delete">Delete</a>
-									</td>
-								</tr>
-								<tr>
-									<th scope="row" class="check-column"><input type="checkbox" name="entry_id[]" value="1086"></th>
-									<td class="indicators column-indicators has-row-actions column-primary" data-colname="">
-										<a href="#" class="indicator-star star" data-id="1086" title="Star entry"><span class="dashicons dashicons-star-filled"></span></a>
-										<a href="#" class="indicator-read read" data-id="1086" title="Mark entry read"><span class="dashicons dashicons-marker"></span></a>
-										<button type="button" class="toggle-row"><span class="screen-reader-text">Show more details</span></button>
-									</td>
-									<td class="wpforms_field_0 column-wpforms_field_0" data-colname="Name">Philip Norton</td>
-									<td class="wpforms_field_1 column-wpforms_field_1" data-colname="Email">PhilipTNorton@example.com</td>
-									<td class="wpforms_field_2 column-wpforms_field_2" data-colname="Comment or Message">
-										Etiam cursus orci tellus, ut vehicula odio mattis sit amet. Curabitur eros …
-									</td>
-									<td class="date column-date" data-colname="Date">July 27, 2017</td>
-									<td class="actions column-actions" data-colname="Actions">
-										<a href="#" title="View Form Entry" class="view">View</a> <span	class="sep">|</span> <a href="#" title="Delete Form Entry" class="delete">Delete</a>
-									</td>
-								</tr>
-								<tr>
-									<th scope="row" class="check-column"><input type="checkbox" name="entry_id[]" value="1085"></th>
-									<td class="indicators column-indicators has-row-actions column-primary" data-colname="">
-										<a href="#" class="indicator-star star" data-id="1085" title="Star entry"><span class="dashicons dashicons-star-filled"></span></a>
-										<a href="#" class="indicator-read read" data-id="1085" title="Mark entry read"><span class="dashicons dashicons-marker"></span></a>
-										<button type="button" class="toggle-row"><span class="screen-reader-text">Show more details</span></button>
-									</td>
-									<td class="wpforms_field_0 column-wpforms_field_0" data-colname="Name">Kevin Gregory</td>
-									<td class="wpforms_field_1 column-wpforms_field_1" data-colname="Email">KevinJGregory@example.com</td>
-									<td class="wpforms_field_2 column-wpforms_field_2" data-colname="Comment or Message">
-										Cras vel orci congue, tincidunt eros vitae, consectetur risus. Proin enim m…
-									</td>
-									<td class="date column-date" data-colname="Date">July 27, 2017</td>
-									<td class="actions column-actions" data-colname="Actions">
-										<a href="#" title="View Form Entry" class="view">View</a> <span	class="sep">|</span> <a href="#" title="Delete Form Entry" class="delete">Delete</a>
-									</td>
-								</tr>
-								<tr>
-									<th scope="row" class="check-column"><input type="checkbox" name="entry_id[]" value="1084"></th>
-									<td class="indicators column-indicators has-row-actions column-primary" data-colname="">
-										<a href="#" class="indicator-star star" data-id="1084" title="Star entry"><span class="dashicons dashicons-star-filled"></span></a>
-										<a href="#" class="indicator-read read" data-id="1084" title="Mark entry read"><span class="dashicons dashicons-marker"></span></a>
-										<button type="button" class="toggle-row"><span class="screen-reader-text">Show more details</span></button>
-									</td>
-									<td class="wpforms_field_0 column-wpforms_field_0" data-colname="Name">John Heiden</td>
-									<td class="wpforms_field_1 column-wpforms_field_1" data-colname="Email">JohnCHeiden@example.com</td>
-									<td class="wpforms_field_2 column-wpforms_field_2" data-colname="Comment or Message">
-										Fusce consequat dui ut orci tempus cursus. Vivamus ut neque id ipsum tempor…
-									</td>
-									<td class="date column-date" data-colname="Date">July 27, 2017</td>
-									<td class="actions column-actions" data-colname="Actions">
-										<a href="#" title="View Form Entry" class="view">View</a> <span	class="sep">|</span> <a href="#" title="Delete Form Entry" class="delete">Delete</a>
-									</td>
-								</tr>
-								<tr>
-									<th scope="row" class="check-column"><input type="checkbox" name="entry_id[]" value="1083"></th>
-									<td class="indicators column-indicators has-row-actions column-primary" data-colname="">
-										<a href="#" class="indicator-star star" data-id="1083" title="Star entry"><span class="dashicons dashicons-star-filled"></span></a>
-										<a href="#" class="indicator-read read" data-id="1083" title="Mark entry read"><span class="dashicons dashicons-marker"></span></a>
-										<button type="button" class="toggle-row"><span class="screen-reader-text">Show more details</span></button>
-									</td>
-									<td class="wpforms_field_0 column-wpforms_field_0" data-colname="Name">Laura Shuler</td>
-									<td class="wpforms_field_1 column-wpforms_field_1" data-colname="Email">LauraDShuler@example.com</td>
-									<td class="wpforms_field_2 column-wpforms_field_2" data-colname="Comment or Message">
-										In ac finibus erat. Curabitur sit amet ante nec tellus commodo commodo non …
-									</td>
-									<td class="date column-date" data-colname="Date">July 27, 2017</td>
-									<td class="actions column-actions" data-colname="Actions">
-										<a href="#" title="View Form Entry" class="view">View</a> <span	class="sep">|</span> <a href="#" title="Delete Form Entry" class="delete">Delete</a>
-									</td>
-								</tr>
-								<tr>
-									<th scope="row" class="check-column"><input type="checkbox" name="entry_id[]" value="1082"></th>
-									<td class="indicators column-indicators has-row-actions column-primary" data-colname="">
-										<a href="#" class="indicator-star star" data-id="1082" title="Star entry"><span class="dashicons dashicons-star-filled"></span></a>
-										<a href="#" class="indicator-read read" data-id="1082" title="Mark entry read"><span class="dashicons dashicons-marker"></span></a>
-										<button type="button" class="toggle-row"><span class="screen-reader-text">Show more details</span></button>
-									</td>
-									<td class="wpforms_field_0 column-wpforms_field_0" data-colname="Name">Walter Sullivan</td>
-									<td class="wpforms_field_1 column-wpforms_field_1" data-colname="Email">WalterPSullivan@example.com</td>
-									<td class="wpforms_field_2 column-wpforms_field_2" data-colname="Comment or Message">
-										Phasellus semper magna leo, ut porta nibh pretium sed. Interdum et malesuad…
-									</td>
-									<td class="date column-date" data-colname="Date">July 27, 2017</td>
-									<td class="actions column-actions" data-colname="Actions">
-										<a href="#" title="View Form Entry" class="view">View</a> <span	class="sep">|</span> <a href="#" title="Delete Form Entry" class="delete">Delete</a>
-									</td>
-								</tr>
-								<tr>
-									<th scope="row" class="check-column"><input type="checkbox" name="entry_id[]" value="1081"></th>
-									<td class="indicators column-indicators has-row-actions column-primary" data-colname="">
-										<a href="#" class="indicator-star star" data-id="1081" title="Star entry"><span class="dashicons dashicons-star-filled"></span></a>
-										<a href="#" class="indicator-read read" data-id="1081" title="Mark entry read"><span class="dashicons dashicons-marker"></span></a>
-										<button type="button" class="toggle-row"><span class="screen-reader-text">Show more details</span></button>
-									</td>
-									<td class="wpforms_field_0 column-wpforms_field_0" data-colname="Name">Gary Austin</td>
-									<td class="wpforms_field_1 column-wpforms_field_1" data-colname="Email">GaryJAustin@example.com</td>
-									<td class="wpforms_field_2 column-wpforms_field_2" data-colname="Comment or Message">
-										Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec sit amet ero…
-									</td>
-									<td class="date column-date" data-colname="Date">July 27, 2017</td>
-									<td class="actions column-actions" data-colname="Actions">
-										<a href="#" title="View Form Entry" class="view">View</a> <span	class="sep">|</span> <a href="#" title="Delete Form Entry" class="delete">Delete</a>
-									</td>
-								</tr>
-								<tr>
-									<th scope="row" class="check-column"><input type="checkbox" name="entry_id[]" value="1080"></th>
-									<td class="indicators column-indicators has-row-actions column-primary" data-colname="">
-										<a href="#" class="indicator-star star" data-id="1080" title="Star entry"><span class="dashicons dashicons-star-filled"></span></a>
-										<a href="#" class="indicator-read read" data-id="1080" title="Mark entry read"><span class="dashicons dashicons-marker"></span></a>
-										<button type="button" class="toggle-row"><span class="screen-reader-text">Show more details</span></button>
-									</td>
-									<td class="wpforms_field_0 column-wpforms_field_0" data-colname="Name">Mark Frahm</td>
-									<td class="wpforms_field_1 column-wpforms_field_1" data-colname="Email">MarkTFrahm@example.com</td>
-									<td class="wpforms_field_2 column-wpforms_field_2" data-colname="Comment or Message">
-										Proin euismod tellus quis tortor bibendum, a pulvinar libero fringilla. Cur…
-									</td>
-									<td class="date column-date" data-colname="Date">July 27, 2017</td>
-									<td class="actions column-actions" data-colname="Actions">
-										<a href="#" title="View Form Entry" class="view">View</a> <span	class="sep">|</span> <a href="#" title="Delete Form Entry" class="delete">Delete</a>
-									</td>
-								</tr>
-								<tr>
-									<th scope="row" class="check-column"><input type="checkbox" name="entry_id[]" value="1079"></th>
-									<td class="indicators column-indicators has-row-actions column-primary" data-colname="">
-										<a href="#" class="indicator-star star" data-id="1079" title="Star entry"><span class="dashicons dashicons-star-filled"></span></a>
-										<a href="#" class="indicator-read read" data-id="1079" title="Mark entry read"><span class="dashicons dashicons-marker"></span></a>
-										<button type="button" class="toggle-row"><span class="screen-reader-text">Show more details</span></button>
-									</td>
-									<td class="wpforms_field_0 column-wpforms_field_0" data-colname="Name">Linda Reynolds</td>
-									<td class="wpforms_field_1 column-wpforms_field_1" data-colname="Email">LindaJReynolds@example.com</td>
-									<td class="wpforms_field_2 column-wpforms_field_2" data-colname="Comment or Message">
-										Cras sodales sagittis maximus. Nunc vestibulum orci quis orci pulvinar vulp…
-									</td>
-									<td class="date column-date" data-colname="Date">July 27, 2017</td>
-									<td class="actions column-actions" data-colname="Actions">
-										<a href="#" title="View Form Entry" class="view">View</a> <span	class="sep">|</span> <a href="#" title="Delete Form Entry" class="delete">Delete</a>
-									</td>
-								</tr>
-							</tbody>
-							<tfoot>
-								<tr>
-									<td class="manage-column column-cb check-column">
-										<label class="screen-reader-text" for="cb-select-all-2">Select All</label>
-										<input id="cb-select-all-2" type="checkbox">
-									</td>
-									<th scope="col" class="manage-column column-indicators column-primary"></th>
-									<th scope="col" class="manage-column column-wpforms_field_0">Name</th>
-									<th scope="col" class="manage-column column-wpforms_field_1">Email</th>
-									<th scope="col" class="manage-column column-wpforms_field_2">Comment or Message</th>
-									<th scope="col" class="manage-column column-date sortable desc">
-										<a href="#"><span>Date</span><span class="sorting-indicator"></span></a>
-									</th>
-									<th scope="col" class="manage-column column-actions">Actions</th>
-								</tr>
-							</tfoot>
-						</table>
-					</form>
-				</div>
-			</div>
-		</div>
-		<div class="clear"></div>
-
-		<?php
+		echo wpforms_render( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			'admin/entries/single/entry',
+			[
+				'utm' => $this->get_entries_utm(),
+			],
+			true
+		);
 	}
 
 	/**
@@ -1233,22 +867,43 @@ class WPForms_Lite {
 	 * Increase entries count once a form is submitted.
 	 *
 	 * @since 1.5.9
+	 * @since 1.8.2 Added Payment ID.
 	 *
-	 * @param array      $fields  Set of form fields.
-	 * @param array      $entry   Entry contents.
-	 * @param int|string $form_id Form ID.
+	 * @param array $fields     Set of form fields.
+	 * @param array $entry      Entry contents.
+	 * @param array $form_data  Form data.
+	 * @param int   $entry_id   Entry ID.
+	 * @param int   $payment_id Payment ID for the payment form.
+	 *
+	 * @noinspection PhpMissingParamTypeInspection
+	 * @noinspection PhpUnusedParameterInspection
 	 */
-	public function update_entry_count( $fields, $entry, $form_id ) {
+	public function update_entry_count( $fields, $entry, $form_data, $entry_id, $payment_id ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed
 
-		global $wpdb;
-
-		if ( ! apply_filters( 'wpforms_dash_widget_allow_entries_count_lite', true ) ) {
+		if ( ! empty( $form_data['spam_reason'] ) ) {
 			return;
 		}
 
-		$form_id = absint( $form_id );
+		global $wpdb;
+
+		/**
+		 * Filters whether to allow counting entries for Lite users.
+		 *
+		 * @since 1.5.9
+		 *
+		 * @param bool $allow_entries_count True to allow, false to disallow. Default: true.
+		 */
+		if ( ! apply_filters( 'wpforms_dash_widget_allow_entries_count_lite', true ) ) { // phpcs:ignore WPForms.PHP.ValidateHooks.InvalidHookName
+			return;
+		}
+
+		$form_id = absint( $form_data['id'] );
 
 		if ( empty( $form_id ) ) {
+			return;
+		}
+
+		if ( wpforms_is_form_template( $form_id ) ) {
 			return;
 		}
 
@@ -1259,7 +914,7 @@ class WPForms_Lite {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.NoCaching
 		$wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$wpdb->postmeta}
+				"UPDATE $wpdb->postmeta
 					SET meta_value = meta_value + 1
 					WHERE post_id = %d AND meta_key = 'wpforms_entries_count'",
 				$form_id
@@ -1271,26 +926,40 @@ class WPForms_Lite {
 	 * Submit entry to the Lite Connect API.
 	 *
 	 * @since 1.7.4
+	 * @since 1.8.2 Added Payment ID.
 	 *
-	 * @param array $fields    Set of form fields.
-	 * @param array $entry     Entry contents.
-	 * @param int   $form_id   Form ID.
-	 * @param array $form_data Form data.
+	 * @param array $fields     Set of form fields.
+	 * @param array $entry      Entry contents.
+	 * @param array $form_data  Form data.
+	 * @param int   $entry_id   Entry ID.
+	 * @param int   $payment_id Payment ID for the payment form.
+	 *
+	 * @noinspection PhpMissingParamTypeInspection
+	 * @noinspection PhpUnusedParameterInspection
 	 */
-	public function entry_submit( $fields, $entry, $form_id, $form_data = [] ) {
+	public function entry_submit( $fields, $entry, $form_data, $entry_id, $payment_id ) {
 
 		$submission = wpforms()->get( 'submission' );
 
-		$submission->register( $fields, $entry, $form_id, $form_data );
+		$submission->register( $fields, $entry, $form_data['id'], $form_data );
 
 		// Prepare the entry args.
 		$entry_args = $submission->prepare_entry_data();
 
+		if ( $payment_id ) {
+			$entry_args['type']       = 'payment';
+			$entry_args['payment_id'] = $payment_id;
+		}
+
+		if ( ! empty( $form_data['spam_reason'] ) ) {
+			$entry_args['status'] = 'spam';
+		}
+
 		// Submit entry args and form data to the Lite Connect API.
 		if (
-			 LiteConnect::is_allowed() &&
-			 LiteConnect::is_enabled() &&
-			 ! empty( $entry_args )
+			! empty( $entry_args ) &&
+			LiteConnect::is_allowed() &&
+			LiteConnect::is_enabled()
 		) {
 			( new LiteConnectIntegration() )->submit( $entry_args, $form_data );
 		}
@@ -1323,18 +992,60 @@ class WPForms_Lite {
 	 */
 	public function upgrade_to_pro_menu( WP_Admin_Bar $wp_admin_bar ) {
 
+		$current_screen      = is_admin() ? get_current_screen() : null;
+		$upgrade_utm_content = $current_screen === null ? 'Upgrade to Pro' : 'Upgrade to Pro - ' . $current_screen->base;
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$upgrade_utm_content = empty( $_GET['view'] ) ? $upgrade_utm_content : $upgrade_utm_content . ': ' . sanitize_key( $_GET['view'] );
+
 		$wp_admin_bar->add_menu(
 			[
 				'parent' => 'wpforms-menu',
 				'id'     => 'wpforms-upgrade',
 				'title'  => esc_html__( 'Upgrade to Pro', 'wpforms-lite' ),
-				'href'   => 'https://wpforms.com/lite-upgrade/?utm_campaign=liteplugin&utm_medium=admin-bar&utm_source=WordPress&utm_content=Upgrade+to+Pro',
+				'href'   => esc_url( $this->admin_upgrade_link( 'admin-bar', $upgrade_utm_content ) ),
 				'meta'   => [
 					'target' => '_blank',
 					'rel'    => 'noopener noreferrer',
 				],
 			]
 		);
+	}
+
+	/**
+	 * Upgrade link used within the various admin pages.
+	 *
+	 * TODO: This is a duplicate of the function in the WPForms class. We should refactor this to use the same function.
+	 *
+	 * @since 1.8.5.1
+	 *
+	 * @param string $medium  URL parameter: utm_medium.
+	 * @param string $content URL parameter: utm_content.
+	 *
+	 * @return string
+	 */
+	private function admin_upgrade_link( string $medium = 'link', string $content = '' ): string {
+
+		$url = 'https://wpforms.com/lite-upgrade/';
+
+		if ( wpforms()->is_pro() ) {
+			$license_key = wpforms_get_license_key();
+			$url         = add_query_arg(
+				'license_key',
+				sanitize_text_field( $license_key ),
+				'https://wpforms.com/pricing/'
+			);
+		}
+
+		$upgrade = wpforms_utm_link( $url, apply_filters( 'wpforms_upgrade_link_medium', $medium ), $content ); // phpcs:ignore WPForms.PHP.ValidateHooks.InvalidHookName, WPForms.Comments.PHPDocHooks.RequiredHookDocumentation
+
+		/**
+		 * Modify upgrade link.
+		 *
+		 * @since 1.5.1
+		 *
+		 * @param string $upgrade Upgrade links.
+		 */
+		return apply_filters( 'wpforms_upgrade_link', $upgrade ); // phpcs:ignore WPForms.PHP.ValidateHooks.InvalidHookName
 	}
 
 	/**
@@ -1348,6 +1059,90 @@ class WPForms_Lite {
 		if ( class_exists( LiteConnectIntegration::class ) ) {
 			LiteConnectIntegration::maybe_restart_import_flag();
 		}
+
+		// Wipe templates content cache.
+		if ( class_exists( TemplatesCache::class ) ) {
+			( new TemplatesCache() )->wipe_content_cache();
+		}
+	}
+
+	/**
+	 * Retrieve UTM parameters for Entries pages.
+	 *
+	 * @since 1.8.9
+	 *
+	 * @return array
+	 */
+	private function get_entries_utm(): array {
+
+		return [
+			'entries_list_button' => 'https://wpforms.com/lite-upgrade/?utm_campaign=liteplugin&utm_source=WordPress&utm_medium=entries&utm_content=Upgrade%20Now%20-%20Entries%20list',
+			'entries_list_link'   => 'https://wpforms.com/lite-upgrade/?utm_campaign=liteplugin&utm_source=WordPress&utm_medium=entries&utm_content=Upgrade%20to%20Pro%20-%20Entries%20list',
+			'entry_single_button' => 'https://wpforms.com/lite-upgrade/?utm_campaign=liteplugin&utm_source=WordPress&utm_medium=entries&utm_content=Upgrade%20to%20Pro%20-%20Single%20Entry',
+			'entry_single_link'   => 'https://wpforms.com/lite-upgrade/?utm_campaign=liteplugin&utm_source=WordPress&utm_medium=entries&utm_content=Upgrade%20to%20Pro%20-%20Single%20Entry',
+		];
+	}
+
+	/**
+	 * Retrieve dummy data for the Entries List page.
+	 *
+	 * @since 1.8.9
+	 *
+	 * return array
+	 */
+	private function get_entries_list_data(): array {
+
+		return [
+			[
+				'name' => 'Michael Johnson',
+				'read' => true,
+			],
+			[
+				'name' => 'David Thompson',
+				'read' => true,
+			],
+			[
+				'name' => 'Sarah Parker',
+				'read' => true,
+			],
+			[
+				'name' => 'Brian Anderson',
+				'read' => true,
+				'star' => true,
+			],
+			[
+				'name' => 'Emily Davis',
+				'read' => true,
+				'star' => true,
+			],
+			[
+				'name' => 'Laura White',
+				'read' => true,
+			],
+			[
+				'name' => 'Kevin Wilson',
+				'read' => true,
+			],
+			[
+				'name' => 'Megan Clark',
+				'read' => true,
+			],
+			[
+				'name' => 'Nicole Allen',
+				'read' => true,
+				'star' => true,
+			],
+			[
+				'name' => 'Jason Miller',
+			],
+			[
+				'name' => 'Rachel Moore',
+			],
+			[
+				'name' => 'Chris Taylor',
+				'star' => true,
+			],
+		];
 	}
 }
 
