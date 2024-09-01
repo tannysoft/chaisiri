@@ -78,7 +78,13 @@
                 }
 
                 
-            
+            /**
+            * Gte previous post WHERE
+            * 
+            * @param mixed $where
+            * @param mixed $in_same_term
+            * @param mixed $excluded_terms
+            */
             function cpto_get_previous_post_where($where, $in_same_term, $excluded_terms)
                 {
                     global $post, $wpdb;
@@ -149,7 +155,13 @@
                     
                     return $where;
                 }
-                
+            
+            
+            /**
+            * Get the previous post sort
+            *     
+            * @param mixed $sort
+            */
             function cpto_get_previous_post_sort($sort)
                 {
                     global $post, $wpdb;
@@ -159,6 +171,14 @@
                     return $sort;
                 }
 
+                
+            /**
+            * Get the next post WHERE
+            * 
+            * @param mixed $where
+            * @param mixed $in_same_term
+            * @param mixed $excluded_terms
+            */
             function cpto_get_next_post_where($where, $in_same_term, $excluded_terms)
                 {
                     global $post, $wpdb;
@@ -230,6 +250,12 @@
                     return $where;
                 }
 
+            
+            /**
+            * Get next post sort
+            * 
+            * @param mixed $sort
+            */
             function cpto_get_next_post_sort($sort)
                 {
                     global $post, $wpdb; 
@@ -239,8 +265,136 @@
                     return $sort;    
                 }
 
+            
+            
+            /**
+            * Clear any cache plugins
+            *     
+            */
+            static public function site_cache_clear()
+                {
+                    wp_cache_flush();
+                    
+                    $cleared_cache  =   FALSE;
+                    
+                    if ( function_exists('wp_cache_clear_cache'))
+                        {
+                            wp_cache_clear_cache();
+                            $cleared_cache  =   TRUE;
+                        }
+                    
+                    if ( function_exists('w3tc_flush_all'))
+                        {
+                            w3tc_flush_all();
+                            $cleared_cache  =   TRUE;
+                        }
+                        
+                    if ( function_exists('opcache_reset')    &&  ! ini_get( 'opcache.restrict_api' ) )
+                        {
+                            @opcache_reset();
+                            $cleared_cache  =   TRUE;
+                        }
+                    
+                    if ( function_exists( 'rocket_clean_domain' ) )
+                        {
+                            rocket_clean_domain();
+                            $cleared_cache  =   TRUE;
+                        }
+                        
+                    if ( function_exists('wp_cache_clear_cache')) 
+                        {
+                            wp_cache_clear_cache();
+                            $cleared_cache  =   TRUE;
+                        }
                 
+                    global $wp_fastest_cache;
+                    if ( method_exists( 'WpFastestCache', 'deleteCache' ) && !empty( $wp_fastest_cache ) )
+                        {
+                            $wp_fastest_cache->deleteCache();
+                            $cleared_cache  =   TRUE;
+                        }
+                
+                    //If your host has installed APC cache this plugin allows you to clear the cache from within WordPress
+                    if ( function_exists('apc_clear_cache'))
+                        {
+                            apc_clear_cache();
+                            $cleared_cache  =   TRUE;
+                        }
+                        
+                    if ( function_exists('fvm_purge_all'))
+                        {
+                            fvm_purge_all();
+                            $cleared_cache  =   TRUE;
+                        }
+                    
+                    if ( class_exists( 'autoptimizeCache' ) )     
+                        {
+                            autoptimizeCache::clearall();
+                            $cleared_cache  =   TRUE;
+                        }
+
+                    //WPEngine
+                    if ( class_exists( 'WpeCommon' ) ) 
+                        {
+                            if ( method_exists( 'WpeCommon', 'purge_memcached' ) )
+                                WpeCommon::purge_memcached();
+                            if ( method_exists( 'WpeCommon', 'clear_maxcdn_cache' ) )
+                                WpeCommon::clear_maxcdn_cache();
+                            if ( method_exists( 'WpeCommon', 'purge_varnish_cache' ) )
+                                WpeCommon::purge_varnish_cache();
+                            
+                            $cleared_cache  =   TRUE;
+                        }
+                        
+                    if (class_exists('Cache_Enabler_Disk') && method_exists('Cache_Enabler_Disk', 'clear_cache'))
+                        {
+                            Cache_Enabler_Disk::clear_cache();
+                            $cleared_cache  =   TRUE;
+                        }
+                        
+                    //Perfmatters
+                    if ( class_exists('Perfmatters\CSS') && method_exists('Perfmatters\CSS', 'clear_used_css') )
+                        {
+                            Perfmatters\CSS::clear_used_css();
+                            $cleared_cache  =   TRUE;
+                        }
+                    
+                    if ( defined( 'BREEZE_VERSION' ) )
+                        {
+                            do_action( 'breeze_clear_all_cache' );
+                            $cleared_cache  =   TRUE;
+                        }
+                        
+                    if ( function_exists('sg_cachepress_purge_everything'))
+                        {
+                            sg_cachepress_purge_everything();
+                            $cleared_cache  =   TRUE;
+                        }
+                    
+                    if ( defined ( 'FLYING_PRESS_VERSION' ) )
+                        {
+                            do_action('flying_press_purge_everything:before');
+
+                            @unlink(FLYING_PRESS_CACHE_DIR . '/preload.txt');
+
+                            // Delete all files and subdirectories
+                            FlyingPress\Purge::purge_everything();
+
+                            @mkdir(FLYING_PRESS_CACHE_DIR, 0755, true);
+
+                            do_action('flying_press_purge_everything:after');
+                            
+                            $cleared_cache  =   TRUE;
+                        }
+                        
+                    if (class_exists('\LiteSpeed\Purge'))
+                        {
+                            \LiteSpeed\Purge::purge_all();
+                            $cleared_cache  =   TRUE;
+                        }
+                        
+                    return $cleared_cache;
+                        
+                }    
                 
         }
-
-?>

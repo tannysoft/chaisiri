@@ -3,8 +3,13 @@
 		public static $id = 0;
 		public static $urls = array();
 
-		public static function init(){
-			SinglePreloadWPFC::set_id();
+		public static function init($id = false){
+			if($id){
+	            self::set_id($id);
+	        }else if(isset($_GET["post"]) && $_GET["post"]){
+	            self::set_id($_GET["post"]);
+	        }
+
 			SinglePreloadWPFC::set_urls();
 			SinglePreloadWPFC::set_urls_with_terms();
 		}
@@ -112,16 +117,33 @@
 	        wp_die("Must be admin");
 	    }
 
-		public static function set_id(){
-			if(isset($_GET["post"]) && $_GET["post"]){
-				
-				static::$id = (int) $_GET["post"];
+		public static function set_id($id) {
+	        $id = (int)$id;
 
-				if(get_post_status(static::$id) != "publish"){
-					static::$id = 0;
-				}
-			}
-		}
+	        if(get_post_status($id) === "publish"){
+	            self::$id = $id;
+	        }
+	    }
+	    
+	    public static function create_cache_for_all_urls(){
+	    	if(preg_match("/include\s*\(\s*[\'\"]\/themes\//i", wp_debug_backtrace_summary())){
+	    		return array("success" => false, "error_message" => "You cannot call this function in any theme file");
+	    	}
+
+	    	if(empty(self::$urls)){
+	    		return false;
+	    	}
+
+	    	$res_arr = array();
+
+	    	foreach (self::$urls as $url) {
+	    		$res = $GLOBALS["wp_fastest_cache"]->wpfc_remote_get($url["url"], $url["user-agent"]);
+
+	    		array_push($res_arr, array("url" => $url["url"], "success" => $res));
+	    	}
+
+	    	return $res_arr;
+	    }
 
 		public static function create_cache(){
 			$res = $GLOBALS["wp_fastest_cache"]->wpfc_remote_get($_GET["url"], $_GET["user_agent"]);

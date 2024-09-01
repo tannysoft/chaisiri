@@ -54,6 +54,16 @@
 									continue;
 								}
 
+								if(preg_match("/data-no-minify/i", $script_tag)){
+									if($key > 0 && $prev_content){
+										$this->mergeJs($prev_content, $this->jsLinks[$key - 1]);
+										$prev_content = "";
+										continue;
+									}else{
+										continue;
+									}
+								}
+
 								$minifiedJs = $this->minify($href);
 
 								if($minifiedJs){

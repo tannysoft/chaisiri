@@ -60,6 +60,11 @@
 
 				if(is_wp_error( $response ) || $response['response']['code'] != '200'){
 
+					if($response->get_error_messages()){
+						return array("success" => "", "message" => $response->get_error_message());
+
+					}
+
 					if($response['response']['code'] == "501"){
 						$text = '"Purge" method is not allowed';
 
@@ -70,11 +75,8 @@
 
 						return array("success" => "", "message" => $text);
 					}
-
-
 					
 
-					return array("success" => "", "message" => $response->get_error_message());
 				}
 			}
 

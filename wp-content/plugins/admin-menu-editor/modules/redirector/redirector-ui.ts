@@ -4,7 +4,7 @@
 /// <reference path="../../js/actor-manager.ts" />
 /// <reference path="../actor-selector/actor-selector.ts" />
 /// <reference path="../../js/common.d.ts" />
-/// <reference path="../../ajax-wrapper/ajax-action-wrapper.d.ts" />
+/// <reference path="../../vendor/yahnis-elsts/ajax-wrapper/ajax-action-wrapper.d.ts" />
 
 declare var wsAmeRedirectorSettings: AmeRedirectorUi.ScriptData;
 declare var wsAmeLodash: _.LoDashStatic;
@@ -68,6 +68,9 @@ namespace AmeRedirectorUi {
 		},
 		isUser(): boolean {
 			return false;
+		},
+		hasOwnCap(_: string): boolean | null {
+			return null;
 		}
 	}
 
@@ -146,6 +149,9 @@ namespace AmeRedirectorUi {
 						},
 						isUser(): boolean {
 							return false;
+						},
+						hasOwnCap(_: string): boolean | null {
+							return null;
 						}
 					}
 				}
@@ -483,6 +489,10 @@ namespace AmeRedirectorUi {
 
 		isUser(): this is IAmeUser {
 			return false;
+		}
+
+		hasOwnCap(_: string): boolean | null {
+			return null;
 		}
 	}
 
@@ -853,7 +863,7 @@ namespace AmeRedirectorUi {
 
 		filterUserAutocompleteResults(results: MinimalUserProperties[]): MinimalUserProperties[] {
 			//Filter out users that are already in the current list.
-			const usedLogins = _.indexBy(
+			const usedLogins = _.keyBy(
 				this.currentTriggerView().users(),
 				(redirect) => {
 					return (redirect.actor as IAmeUser).userLogin;

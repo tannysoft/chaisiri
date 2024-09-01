@@ -4,9 +4,10 @@
 
 namespace Composer\Autoload;
 
-class ComposerStaticInit7da2b10f3726366a1aa4039f5a2e7723
+class ComposerStaticInitf59933c8731b39e1456284ca1a798cb6
 {
     public static $classMap = array (
+        'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
         'IWPML_ST_Rewrite_Rule_Filter' => __DIR__ . '/../..' . '/classes/slug-translation/iwpml-st-rewrite-rule-filter.php',
         'IWPML_ST_String_Scanner' => __DIR__ . '/../..' . '/classes/strings-scanning/iwpml-st-string-scanner.php',
         'IWPML_ST_Translations_File' => __DIR__ . '/../..' . '/classes/translations-file-scan/translations-file/iwpml-st-translations-file.php',
@@ -96,6 +97,8 @@ class ComposerStaticInit7da2b10f3726366a1aa4039f5a2e7723
         'WPML\\ST\\Shortcode\\TranslationHandler' => __DIR__ . '/../..' . '/classes/shortcode/TranslationHandler.php',
         'WPML\\ST\\SlugTranslation\\Hooks\\Hooks' => __DIR__ . '/../..' . '/classes/slug-translation/RewriteRules/Hooks.php',
         'WPML\\ST\\SlugTranslation\\Hooks\\HooksFactory' => __DIR__ . '/../..' . '/classes/slug-translation/RewriteRules/HooksFactory.php',
+        'WPML\\ST\\Storage\\StoragePerLanguageInterface' => __DIR__ . '/../..' . '/classes/Storage/StoragePerLanguageInterface.php',
+        'WPML\\ST\\Storage\\WpTransientPerLanguage' => __DIR__ . '/../..' . '/classes/Storage/WpTransientPerLanguage.php',
         'WPML\\ST\\StringsCleanup\\Ajax\\InitStringsRemoving' => __DIR__ . '/../..' . '/classes/strings-cleanup/ajax/InitStringsRemoving.php',
         'WPML\\ST\\StringsCleanup\\Ajax\\RemoveStringsFromDomains' => __DIR__ . '/../..' . '/classes/strings-cleanup/ajax/RemoveStringsFromDomains.php',
         'WPML\\ST\\StringsCleanup\\UI' => __DIR__ . '/../..' . '/classes/strings-cleanup/UI.php',
@@ -326,7 +329,7 @@ class ComposerStaticInit7da2b10f3726366a1aa4039f5a2e7723
     public static function getInitializer(ClassLoader $loader)
     {
         return \Closure::bind(function () use ($loader) {
-            $loader->classMap = ComposerStaticInit7da2b10f3726366a1aa4039f5a2e7723::$classMap;
+            $loader->classMap = ComposerStaticInitf59933c8731b39e1456284ca1a798cb6::$classMap;
 
         }, null, ClassLoader::class);
     }

@@ -5,7 +5,7 @@
 /// <reference path="../../js/actor-manager.ts" />
 /// <reference path="../actor-selector/actor-selector.ts" />
 /// <reference path="../../js/common.d.ts" />
-/// <reference path="../../ajax-wrapper/ajax-action-wrapper.d.ts" />
+/// <reference path="../../vendor/yahnis-elsts/ajax-wrapper/ajax-action-wrapper.d.ts" />
 var AmeRedirectorUi;
 (function (AmeRedirectorUi) {
     const AllKnownTriggers = {
@@ -27,6 +27,9 @@ var AmeRedirectorUi;
         },
         isUser() {
             return false;
+        },
+        hasOwnCap(_) {
+            return null;
         }
     };
     class Redirect {
@@ -81,6 +84,9 @@ var AmeRedirectorUi;
                         },
                         isUser() {
                             return false;
+                        },
+                        hasOwnCap(_) {
+                            return null;
                         }
                     };
                 }
@@ -351,6 +357,9 @@ var AmeRedirectorUi;
         }
         isUser() {
             return false;
+        }
+        hasOwnCap(_) {
+            return null;
         }
     }
     class MissingRolePlaceholder extends MissingActorPlaceholder {
@@ -627,7 +636,7 @@ var AmeRedirectorUi;
         }
         filterUserAutocompleteResults(results) {
             //Filter out users that are already in the current list.
-            const usedLogins = _.indexBy(this.currentTriggerView().users(), (redirect) => {
+            const usedLogins = _.keyBy(this.currentTriggerView().users(), (redirect) => {
                 return redirect.actor.userLogin;
             });
             return _.filter(results, function (props) {

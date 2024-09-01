@@ -124,6 +124,11 @@
 		}
 
 		public static function cloudflare_disable_minify($email = false, $key = false, $zoneid = false){
+			// Deprecated
+			// https://developers.cloudflare.com/speed/optimization/content/auto-minify/
+
+			return array("success" => true);
+
 			if($key && $zoneid){
 				$header = array("method" => "PATCH",
 								'timeout' => 10,
@@ -168,9 +173,10 @@
 				$hostname = preg_replace("/^(https?\:\/\/)?(www\d*\.)?/", "", $_SERVER["HTTP_HOST"]);
 			}
 
-
-			if(function_exists("idn_to_utf8")){
-				$hostname = idn_to_utf8($hostname);
+			if(extension_loaded('intl')){
+				if(function_exists("idn_to_utf8")){
+					$hostname = idn_to_utf8($hostname);
+				}
 			}
 			
 			$header = array("method" => "GET",
@@ -223,7 +229,7 @@
 
 				if(is_array($arr)){
 					foreach ($arr as $cdn_key => $cdn_value) {
-						if($cdn_value->id == "cloudflare"){
+						if($cdn_value->id == "cloudflare" && isset($cdn_value->zone_id)){
 							return unserialize($cdn_value->zone_id);
 						}
 					}

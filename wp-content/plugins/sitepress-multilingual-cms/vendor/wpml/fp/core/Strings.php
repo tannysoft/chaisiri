@@ -76,6 +76,8 @@ class Str {
 		self::macro( 'tail', self::sub( 1 ) );
 
 		self::macro( 'pos', curryN( 2, function( $needle, $haystack ) {
+			$haystack = ( is_null( $haystack ) ) ? '' : $haystack;
+
 			if ( function_exists( 'mb_strpos' ) ) {
 				return mb_strpos( $haystack, $needle );
 			}
@@ -121,6 +123,30 @@ class Str {
 		self::macro( 'toUpper', curryN( 1, 'strtoupper' ) );
 
 		self::macro( 'toLower', curryN( 1, 'strtolower' ) );
+	}
+
+	/**
+	 * Truncates a string to a maximum number of bytes keeping multibyte chars integrity.
+	 *
+	 * @param string $string
+	 * @param int $max_bytes
+	 * @param int|null $max_characters
+	 * @return string
+	 */
+	public static function truncate_bytes( $string, $max_bytes, $max_characters = null ) {
+		if ( $max_characters !== null ) {
+			$string = mb_substr( $string, 0, $max_characters );
+		} else {
+			$string = mb_substr( $string, 0, $max_bytes );
+			$max_characters = mb_strlen( $string );
+		}
+
+		// If the length of the string ( in bytes ) is still too big, we have to cut at least one more character.
+		if ( strlen( $string ) > $max_bytes ) {
+			return static::truncate_bytes( $string, $max_bytes, $max_characters - 1 );
+		}
+
+		return $string;
 	}
 }
 

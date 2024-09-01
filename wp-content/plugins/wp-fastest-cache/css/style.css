@@ -420,6 +420,7 @@ span.deleteicon span.cleared {
     font-size: 11px;
     margin: 0;
     position: relative;
+    padding-top: 3px;
 }
 .int-item img {
     float: left;
@@ -428,7 +429,10 @@ span.deleteicon span.cleared {
     width: 45px;
 }
 .int-item .meta.isConnected{
-    background: url("../images/check.png") no-repeat scroll 100% 0;
+    background-image: url("../images/success.svg");
+    background-repeat: no-repeat;
+    background-size: 24px;
+    background-position: right;
     height: 24px;
     width: 100%;
     max-width: 100%;
@@ -437,7 +441,7 @@ span.deleteicon span.cleared {
 }
 
 .int-item .meta.isConnected.pause{
-    background: url("../images/pause.png") no-repeat scroll 100% 0;
+    background-image: url("../images/pause.svg");
 }
 
 .int-item .meta.success{

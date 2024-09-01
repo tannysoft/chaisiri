@@ -1,8 +1,6 @@
 ///<reference path="knockout.d.ts"/>
 
-interface AmeDictionary<T> {
-	[mapKey: string]: T;
-}
+type AmeDictionary<T> = Record<string, T>;
 
 // noinspection JSUnusedGlobalSymbols
 type KeysMatchingType<T, V> = { [K in keyof T]: T[K] extends V ? K : never }[keyof T];
@@ -37,7 +35,7 @@ interface JQuery {
  * Partial type definition for the WordPress "wp" global.
  * Sure would be nice if WordPress provided this.
  */
-declare const wp: {
+interface AmePartialWpGlobal {
 	codeEditor: {
 		//See /wp-admin/js/code-editor.js for basic method documentation.
 		initialize: (textarea: string|JQuery|Element, options: object) => any;
@@ -56,7 +54,17 @@ declare const wp: {
 		remove: (id: string) => void;
 		initialize: (id: string, settings: Partial<WpEditorInitSettings>) => any;
 	};
-};
+	hooks: {
+		addFilter: (filterName: string, namespace: string, callback: (value: unknown, ...args: unknown[]) => unknown, priority?: number) => void;
+		addAction: (actionName: string, namespace: string, callback: (...args: unknown[]) => unknown, priority?: number) => void;
+		removeFilter: (filterName: string, namespace: string) => void;
+		removeAction: (actionName: string, namespace: string) => void;
+		applyFilters: (filterName: string, value: unknown, ...args: unknown[]) => unknown;
+		doAction: (actionName: string, ...args: unknown[]) => void;
+	};
+}
+
+declare const wp: AmePartialWpGlobal;
 
 /**
  * Incomplete type definition for the settings object that can be passed to wp.editor.initialize().

@@ -67,6 +67,11 @@ class MO extends \MO {
 	}
 
 	private function load() {
+		if ( $this->isLoaded() ) {
+			// Abort as the domain just needs to be loaded once.
+			return true;
+		}
+
 		$this->isLoading = true;
 		$this->loadTextDomain();
 
@@ -87,7 +92,7 @@ class MO extends \MO {
 		$this->loaded_mo_dictionary
 			->getFiles( $this->domain, $this->locale )
 			->each( function( $mofile ) {
-				load_textdomain( $this->domain, $mofile );
+				load_textdomain( $this->domain, $mofile, $this->locale );
 			} );
 	}
 

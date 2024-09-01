@@ -16,7 +16,7 @@
 			add_filter('plugin_locale', array($this, 'my_plugin_locale_filter'), 10, 2);
 		}
 
-		function my_plugin_locale_filter($locale, $domain){
+		public function my_plugin_locale_filter($locale, $domain){
 			if($domain === 'wp-fastest-cache'){
 
 				if(!isset($this->options->wpFastestCacheLanguage)){
@@ -390,6 +390,15 @@
 				}
 			}
 
+			if(get_option('template') == "Divi"){
+				// Divi Theme - Static CSS File Generation
+				if($et_divi = get_option("et_divi")){
+					if(isset($et_divi["et_pb_static_css_file"]) && $et_divi["et_pb_static_css_file"] == "on"){
+						return array("You have to disable the <u><a target='_blank' href='https://www.wpfastestcache.com/tutorial/divi-theme-settings/'>Static CSS File Generation</a></u> option of Divi Theme", "error");
+					}
+				}
+			}
+
 			if(file_exists($path.".htaccess")){
 				$htaccess = @file_get_contents($path.".htaccess");
 			}else{
@@ -405,6 +414,8 @@
 				return array("You have to set <strong><u><a target='_blank' href='https://www.wpfastestcache.com/tutorial/how-to-change-default-permalink-in-wordpress/'>permalinks</a></u></strong>", "error");
 			}else if($res = $this->checkSuperCache($path, $htaccess)){
 				return $res;
+			}else if($this->isPluginActive('cookie-notice/cookie-notice.php')){
+				return array("Cookie Notice & Compliance for GDPR / CCPA needs to be deactivated", "error");
 			}else if($this->isPluginActive('fast-velocity-minify/fvm.php')){
 				return array("Fast Velocity Minify needs to be deactivated", "error");
 			}else if($this->isPluginActive('far-future-expiration/far-future-expiration.php')){
@@ -596,7 +607,7 @@
 
 
 			$data = "# BEGIN LBCWpFastestCache"."\n".
-					'<FilesMatch "\.(webm|ogg|mp4|ico|pdf|flv|avif|jpg|jpeg|png|gif|webp|js|css|swf|x-html|css|xml|js|woff|woff2|otf|ttf|svg|eot)(\.gz)?$">'."\n".
+					'<FilesMatch "\.(webm|ogg|mp4|ico|pdf|flv|avif|jpg|jpeg|png|gif|webp|js|css|swf|x-html|xml|woff|woff2|otf|ttf|svg|eot)(\.gz)?$">'."\n".
 					'<IfModule mod_expires.c>'."\n".
 					'AddType application/font-woff2 .woff2'."\n".
 					'AddType application/x-font-opentype .otf'."\n".
@@ -752,7 +763,7 @@
 				}
 			}
 
-			if($this->isPluginActive('polylang/polylang.php')){
+			if($this->isPluginActive('polylang/polylang.php') || $this->isPluginActive('polylang-pro/polylang.php')){
 				$polylang_settings = get_option("polylang");
 
 				if(isset($polylang_settings["force_lang"])){
@@ -1053,11 +1064,16 @@
 
 				<div class="tabGroup">
 					<?php
-						$tabs = array(array("id"=>"wpfc-options","title" => __("Settings", "wp-fastest-cache" )),
-									  array("id"=>"wpfc-deleteCache","title" => __("Delete Cache", "wp-fastest-cache" )));
+						$tabs = array();
 						
+						array_push($tabs, array("id"=>"wpfc-options","title" => __("Settings", "wp-fastest-cache" )));
+						array_push($tabs, array("id"=>"wpfc-deleteCache","title" => __("Delete Cache", "wp-fastest-cache" )));
 						array_push($tabs, array("id"=>"wpfc-imageOptimisation","title" => __("Image Optimization", "wp-fastest-cache" )));
-						array_push($tabs, array("id"=>"wpfc-premium","title"=>"Premium"));
+
+						if(!class_exists("WpFastestCachePowerfulHtml")){
+							array_push($tabs, array("id"=>"wpfc-premium","title"=>"Premium"));
+						}
+
 						array_push($tabs, array("id"=>"wpfc-exclude","title"=>__("Exclude", "wp-fastest-cache" )));
 						array_push($tabs, array("id"=>"wpfc-cdn","title"=>"CDN"));
 						array_push($tabs, array("id"=>"wpfc-db","title"=>"DB"));
@@ -1411,12 +1427,6 @@
 										}
 									?>
 
-								<?php }else{ ?>
-									<div class="questionCon update-needed">
-										<div class="question">Lazy Load</div>
-										<div class="inputCon"><input type="checkbox" id="wpFastestCacheLazyLoad" name="wpFastestCacheLazyLoad"><label for="wpFastestCacheLazyLoad"><?php _e("Load images and iframes when they enter the browsers viewport", "wp-fastest-cache"); ?></label></div>
-										<div class="get-info"><a target="_blank" href="http://www.wpfastestcache.com/premium/lazy-load-reduce-http-request-and-page-load-time/"><img src="<?php echo plugins_url("wp-fastest-cache/images/info.png"); ?>" /></a></div>
-									</div>
 								<?php } ?>
 							<?php }else{ ?>
 								<div class="questionCon disabled">
@@ -1427,33 +1437,22 @@
 							<?php } ?>
 
 
-							<?php if(defined('WPFC_ENABLE_DELAY_JS') && WPFC_ENABLE_DELAY_JS){ ?>
 
-								<?php if(class_exists("WpFastestCachePowerfulHtml")){ ?> 
-									<?php if(method_exists("WpFastestCachePowerfulHtml", "google_fonts")){ ?>
-										<div class="questionCon">
-											<div class="question"><?php _e('Delay Js', 'wp-fastest-cache'); ?></div>
-											<div class="inputCon"><input type="checkbox" <?php echo $wpFastestCacheDelayJS; ?> id="wpFastestCacheDelayJS" name="wpFastestCacheDelayJS"><label for="wpFastestCacheDelayJS"><?php _e("Some js sources will not be loaded until scrolling or moving the mouse", "wp-fastest-cache"); ?></label></div>
-											<div class="get-info"><a target="_blank" href="https://www.wpfastestcache.com/premium/delay-javascript/"><img src="<?php echo plugins_url("wp-fastest-cache/images/info.png"); ?>" /></a></div>
-										</div>
-									<?php }else{ ?>
-										<div class="questionCon update-needed">
-											<div class="question"><?php _e('Delay Js', 'wp-fastest-cache'); ?></div>
-											<div class="inputCon"><input type="checkbox" id="wpFastestCacheDelayJS" name="wpFastestCacheDelayJS"><label for="wpFastestCacheDelayJS"><?php _e("Some js sources will not be loaded until scrolling or moving the mouse", "wp-fastest-cache"); ?></label></div>
-											<div class="get-info"><a target="_blank" href="https://www.wpfastestcache.com/premium/delay-javascript/"><img src="<?php echo plugins_url("wp-fastest-cache/images/info.png"); ?>" /></a></div>
-										</div>
-									<?php } ?>
-								<?php }else{ ?>
-									<div class="questionCon disabled">
+							<?php if(class_exists("WpFastestCachePowerfulHtml")){ ?> 
+								<?php if(file_exists(WPFC_WP_PLUGIN_DIR."/wp-fastest-cache-premium/pro/library/delay-js.php")){ ?>
+									<div class="questionCon">
 										<div class="question"><?php _e('Delay Js', 'wp-fastest-cache'); ?></div>
-										<div class="inputCon"><input type="checkbox" id="wpFastestCacheDelayJS" name="wpFastestCacheDelayJS"><label for="wpFastestCacheDelayJS"><?php _e("Some js sources will not be loaded until scrolling or moving the mouse", "wp-fastest-cache"); ?></label></div>
+										<div class="inputCon"><input type="checkbox" <?php echo $wpFastestCacheDelayJS; ?> id="wpFastestCacheDelayJS" name="wpFastestCacheDelayJS"><label for="wpFastestCacheDelayJS"><?php _e("Some js sources will not be loaded until scrolling or moving the mouse", "wp-fastest-cache"); ?></label></div>
 										<div class="get-info"><a target="_blank" href="https://www.wpfastestcache.com/premium/delay-javascript/"><img src="<?php echo plugins_url("wp-fastest-cache/images/info.png"); ?>" /></a></div>
 									</div>
 								<?php } ?>
-								
+							<?php }else{ ?>
+								<div class="questionCon disabled">
+									<div class="question"><?php _e('Delay Js', 'wp-fastest-cache'); ?></div>
+									<div class="inputCon"><input type="checkbox" id="wpFastestCacheDelayJS" name="wpFastestCacheDelayJS"><label for="wpFastestCacheDelayJS"><?php _e("Some js sources will not be loaded until scrolling or moving the mouse", "wp-fastest-cache"); ?></label></div>
+									<div class="get-info"><a target="_blank" href="https://www.wpfastestcache.com/premium/delay-javascript/"><img src="<?php echo plugins_url("wp-fastest-cache/images/info.png"); ?>" /></a></div>
+								</div>
 							<?php } ?>
-							
-
 
 
 
@@ -1481,6 +1480,7 @@
 															  'nl_NL' => 'Nederlands',
 															  'nl_BE' => 'Nederlands (België)',
 															  'sk_SK' => 'Slovenčina',
+															  'sl_SI' => 'Slovenščina',
 															  'fi' => 'Suomi',
 															  'sv_SE' => 'Svenska',
 															  'tr_TR' => 'Türkçe',
@@ -1496,8 +1496,10 @@
 											foreach($lang_array as $lang_array_key => $lang_array_value){
 												$option_selected = "";
 
-												if(isset($this->options->wpFastestCacheLanguage) && ($this->options->wpFastestCacheLanguage == $lang_array_key)){
-													$option_selected = 'selected="selected"';
+												if(isset($this->options->wpFastestCacheLanguage)){
+													if($this->options->wpFastestCacheLanguage == $lang_array_key){
+														$option_selected = 'selected="selected"';
+													}
 												}else{
 													if($lang_array_key == "en_US" || $lang_array_key == "en_EN"){
 														$option_selected = 'selected="selected"';
@@ -2070,10 +2072,10 @@
 				    		<div class="integration-page" style="display: block;width:98%;float:left;">
 
 				    			<div wpfc-cdn-name="maxcdn" class="int-item int-item-left">
-				    				<img style="border-radius:50px;" src="<?php echo plugins_url("wp-fastest-cache/images/stackpath.png"); ?>" />
+				    				<img style="border-radius:50px;" src="<?php echo plugins_url("wp-fastest-cache/images/bunny-cdn-icon.png"); ?>" />
 				    				<div class="app">
-				    					<div style="font-weight:bold;font-size:14px;">CDN by StackPath</div>
-				    					<p>Secure and accelerate your web sites</p>
+				    					<div style="font-weight:bold;font-size:14px;">CDN by Bunny</div>
+				    					<p>Speed up content with next-generation CDN</p>
 				    				</div>
 				    				<div class="meta"></div>
 				    			</div>

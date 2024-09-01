@@ -186,7 +186,7 @@
 											<tbody>
 												<tr>
 										    		<td class="" width="300" style="text-align: center;">
-														<label><?php _e("Server Time", "wp-fastest-cache"); ?>: </label><label class="wpfc-server-time"><?php echo date("H:i:s"); ?></label>
+														<label><?php _e("Server Time", "wp-fastest-cache"); ?>: </label><label class="wpfc-server-time"><?php echo current_time("H:i:s"); ?></label>
 										    		</td>
 										    	</tr>
 										    </tbody>

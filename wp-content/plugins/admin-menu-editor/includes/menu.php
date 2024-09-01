@@ -1,7 +1,7 @@
 <?php
 abstract class ameMenu {
 	const format_name = 'Admin Menu Editor menu';
-	const format_version = '7.0';
+	const format_version = '7.1';
 
 	protected static $custom_loaders = array();
 
@@ -83,10 +83,14 @@ abstract class ameMenu {
 		$menu = self::add_format_header($menu);
 
 		if ( $is_normalized && !$always_normalize ) {
-			$menu['tree'] = $arr['tree'];
+			if ( isset($arr['tree']) ) {
+				$menu['tree'] = $arr['tree'];
+			}
 		} else {
-			foreach($arr['tree'] as $file => $item) {
-				$menu['tree'][$file] = ameMenuItem::normalize($item);
+			if ( isset($arr['tree']) ) {
+				foreach ($arr['tree'] as $file => $item) {
+					$menu['tree'][$file] = ameMenuItem::normalize($item);
+				}
 			}
 			$menu['format']['is_normalized'] = true;
 		}
@@ -268,6 +272,16 @@ abstract class ameMenu {
 		return $result;
 	}
 
+	/**
+	 * Create a new, empty menu configuration.
+	 *
+	 * @return array
+	 */
+	public static function new_empty_config() {
+		$menu = array('tree' => array());
+		return self::add_format_header($menu);
+	}
+
   /**
    * Sort the menus and menu items of a given menu according to their positions
    *
@@ -298,6 +312,10 @@ abstract class ameMenu {
 	public static function wp2tree($menu, $submenu, $blacklist = array()){
 		$tree = array();
 		foreach ($menu as $pos => $item){
+			//Sanity check: The item should be array-like.
+			if ( !is_array($item) && !($item instanceof ArrayAccess) ) {
+				continue;
+			}
 
 			$tree_item = ameMenuItem::blank_menu();
 			$tree_item['defaults'] = ameMenuItem::fromWpItem($item, $pos);
@@ -307,6 +325,11 @@ abstract class ameMenu {
 			$parent = $tree_item['defaults']['file'];
 			if ( isset($submenu[$parent]) ){
 				foreach($submenu[$parent] as $position => $subitem){
+					//Sanity check: Same as above.
+					if ( !is_array($subitem) && !($subitem instanceof ArrayAccess) ) {
+						continue;
+					}
+
 					$defaults = ameMenuItem::fromWpItem($subitem, $position, $parent);
 
 					//Skip blacklisted items.
@@ -489,8 +512,10 @@ abstract class ameMenu {
 			return $menu;
 		}
 
-		$common = $menu['format']['common'];
-		$menu['tree'] = self::decompress_list($menu['tree'], $common);
+		if ( !empty($menu['tree']) ) {
+			$common = $menu['format']['common'];
+			$menu['tree'] = self::decompress_list($menu['tree'], $common);
+		}
 
 		unset($menu['format']['compressed'], $menu['format']['common']);
 		return $menu;
@@ -527,7 +552,7 @@ abstract class ameMenu {
 	 * @param array|null $extra_params Optional. An array of additional parameters to pass to the callback.
 	 * @return array
 	 */
-	protected static function map_items($items, $callback, $extra_params = null) {
+	public static function map_items($items, $callback, $extra_params = null) {
 		if ( $extra_params === null ) {
 			$extra_params = array();
 		}
@@ -620,7 +645,9 @@ class ameModifiedIconDetector {
 
 	public static function detect($menu) {
 		$detector = new self();
-		ameMenu::for_each($menu['tree'], array($detector, 'checkItem'));
+		if ( !empty($menu['tree']) ) {
+			ameMenu::for_each($menu['tree'], array($detector, 'checkItem'));
+		}
 		return $detector->getResult();
 	}
 

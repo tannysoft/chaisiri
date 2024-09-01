@@ -345,8 +345,8 @@ class WP {
 			$locale['']['plural_forms'] = $translations->headers['Plural-Forms'];
 		}
 
-		foreach ( $translations->entries as $msgid => $entry ) {
-			$locale[ $msgid ] = $entry->translations;
+		foreach ( $translations->entries as $entry ) {
+			$locale[ $entry->singular ] = $entry->translations;
 		}
 
 		return $locale;
@@ -567,6 +567,7 @@ class WP {
 		}
 
 		if ( empty( $initiator ) ) {
+			$initiator         = [];
 			$initiator['name'] = esc_html__( 'N/A', 'wp-mail-smtp' );
 			$initiator['slug'] = '';
 			$initiator['type'] = 'unknown';
