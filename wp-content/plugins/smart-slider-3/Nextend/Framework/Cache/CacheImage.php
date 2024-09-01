@@ -114,7 +114,7 @@ class CacheImage extends AbstractCache {
     private function getRemoteMTime($url) {
         if (ini_get('allow_url_fopen')) {
             $h = get_headers($url, 1);
-            if (!$h || strpos($h[0], '200') !== false) {
+            if (is_array($h) && strpos($h[0], '200') !== false) {
                 foreach ($h as $k => $v) {
                     if (strtolower(trim($k)) == "last-modified") {
                         return (new DateTime($v))->getTimestamp();

@@ -198,6 +198,17 @@ class GeneratorGroupPosts extends AbstractGeneratorGroup {
         return preg_replace("/-/", "_", $size);
     }
 
+    public static function arrayMerge($original_array, $added_array, $pre = 'meta_') {
+        foreach ($added_array as $name => $value) {
+            while (isset($original_array[$name])) {
+                $name = $pre . $name;
+            }
+            $original_array[$name] = $value;
+        }
+
+        return $original_array;
+    }
+
     public static function removeShortcodes($variable) {
         return preg_replace('#\[[^\]]+\]#', '', $variable);
     }

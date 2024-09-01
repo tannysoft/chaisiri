@@ -338,9 +338,9 @@ class PostsPosts extends AbstractGenerator {
                 $record['tag_' . ($j + 1)] = $tags[$j]->name;
             }
 
-            $record = array_merge($record, GeneratorGroupPosts::getACFData($post->ID));
+            $record = GeneratorGroupPosts::arrayMerge($record, GeneratorGroupPosts::getACFData($post->ID), 'acf_');
 
-            $record = array_merge($record, GeneratorGroupPosts::extractPostMeta(get_post_meta($post->ID)));
+            $record = GeneratorGroupPosts::arrayMerge($record, GeneratorGroupPosts::extractPostMeta(get_post_meta($post->ID)));
 
             if (isset($record['primarytermcategory'])) {
                 $primary                         = get_category($record['primarytermcategory']);

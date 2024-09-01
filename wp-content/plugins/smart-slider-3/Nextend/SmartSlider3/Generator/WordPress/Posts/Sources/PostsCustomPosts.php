@@ -446,7 +446,7 @@ class PostsCustomPosts extends AbstractGenerator {
             $record['thumbnail'] = $record['image'] = $record['featured_image'];
             $record['url_label'] = 'View';
 
-            $record = array_merge($record, GeneratorGroupPosts::extractPostMeta(get_post_meta($post->ID)));
+            $record = GeneratorGroupPosts::arrayMerge($record, GeneratorGroupPosts::extractPostMeta(get_post_meta($post->ID)));
 
             $taxonomies = get_post_taxonomies($post->ID);
             $args       = array(
@@ -466,7 +466,7 @@ class PostsCustomPosts extends AbstractGenerator {
                 }
             }
 
-            $record = array_merge($record, GeneratorGroupPosts::getACFData($post->ID));
+            $record = GeneratorGroupPosts::arrayMerge($record, GeneratorGroupPosts::getACFData($post->ID), 'acf_');
 
             if (isset($record['primarytermcategory'])) {
                 $primary                         = get_category($record['primarytermcategory']);

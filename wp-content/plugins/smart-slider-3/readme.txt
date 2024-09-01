@@ -3,8 +3,8 @@ Contributors: nextendweb
 Tags: slider, wordpress slider, image slider, layer slider, responsive slider, slideshow, fullwidth slider, post slider, horizontal slider, vertical slider, photo slider, video slider
 Donate link: https://sites.fastspring.com/nextend/product/smartslider3donate
 Requires at least: 5.0
-Tested up to: 6.4.1
-Stable tag: 3.5.1.21
+Tested up to: 6.5
+Stable tag: 3.5.1.23
 Requires PHP: 7.0
 License: GPLv3 or later
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
@@ -216,6 +216,16 @@ Of course! Smart Slider use protocol relative urls which works fine on http:// a
 9. Enhance your site with our FREE Layer Slider's stylish layers for a better user experience.
 
 == Changelog ==
+
+= 3.5.1.23 - 11. April 2024 =
+* Fix: At WordPress Posts generator if you have a meta data or ACF data with a name already used as a variable, it can get overwritten.
+* Fix: Security improvements for image uploads.
+* Fix: Only allow files with WordPress allowed mime types to be uploaded.
+* Fix: The Resize and Convert to webp features could have issues with images from certain external servers.
+
+= 3.5.1.22 - 27. February 2024 =
+* Feature: Youtube videos cannot be started until they fully loaded, but from now on, we will detect early click actions on them and try to start the video once it loaded, as long as it is not prevented by a browser limitation.
+* Removed: Black Friday sale notification removed.
 
 = 3.5.1.21 - 15. November 2023 =
 * Fix: Previous widget rendering fix undone. Our widget will render, even when the theme doesn't supports it, because you can use widgets in themes that way too.

@@ -2,7 +2,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: \n"
-"POT-Creation-Date: 2023-06-09 14:38+0200\n"
+"POT-Creation-Date: 2024-04-08 14:12+0200\n"
 "PO-Revision-Date: 2020-03-10 19:30+0100\n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -28,7 +28,13 @@ msgstr ""
 msgid "You are not allowed to upload!"
 msgstr ""
 
+msgid "You are not allowed to upload this filetype!"
+msgstr ""
+
 msgid "Folder is missing!"
+msgstr ""
+
+msgid "You are not allowed to upload a file with different extension ("
 msgstr ""
 
 msgid "Menu item"
@@ -3498,6 +3504,9 @@ msgstr ""
 msgid "Hides the profile image of the author, but only if video owner allows it. "
 msgstr ""
 
+msgid "Iframe title"
+msgstr ""
+
 msgid "Play button"
 msgstr ""
 
@@ -4453,15 +4462,6 @@ msgstr ""
 msgid "No options given"
 msgstr ""
 
-msgid "The secret is empty. Please insert that value too!"
-msgstr ""
-
-msgid "The App ID is empty. Please insert that value too!"
-msgstr ""
-
-msgid "The Facebook generator will get deprecated soon, so you shouldn't use it anymore!"
-msgstr ""
-
 #, php-format
 msgid "%1$s allows HTTPS Redirect URIs only! You must move your site to HTTPS in order to use this generator!"
 msgstr ""
@@ -4473,73 +4473,19 @@ msgstr ""
 msgid "%2$s Check the documentation %3$s to learn how to configure your %1$s app."
 msgstr ""
 
-msgctxt "Facebook app permission"
-msgid "pages read engagement"
-msgstr ""
-
-msgid "Pages read engagement permission"
-msgstr ""
-
-msgid "You need \"pages_read_engagement\" permission if you want to access datas of Facebook pages, where you are an administrator. For other pages you still need to turn this option on, but request access to \"Page Public Content Access\" within your App."
-msgstr ""
-
-msgctxt "Facebook app permission"
-msgid "user photos"
-msgstr ""
-
-msgid "User photos permission"
-msgstr ""
-
-msgid "You need \"user_photos\" permission to access photos of users, except your own user."
-msgstr ""
-
 msgid "Token"
 msgstr ""
 
 msgid "Callback url"
 msgstr ""
 
-msgid "The token expired. Please request new token! "
+msgid "The key and secret is not valid!"
 msgstr ""
 
 msgid "Request token"
 msgstr ""
 
-msgid "Facebook photos or posts on your page"
-msgstr ""
-
-msgid "Photos by album"
-msgstr ""
-
-msgid "Posts by page"
-msgstr ""
-
-msgid "User or page"
-msgstr ""
-
 msgid "Album"
-msgstr ""
-
-msgctxt "Facebook generator type"
-msgid "Facebook posts"
-msgstr ""
-
-msgid "Page"
-msgstr ""
-
-msgid "Feed"
-msgstr ""
-
-msgid "Remove special characters"
-msgstr ""
-
-msgid "Exclude Types"
-msgstr ""
-
-msgid "Separate the types by a comma. E.g.: share,album"
-msgstr ""
-
-msgid "The key and secret is not valid!"
 msgstr ""
 
 msgid "There are no photos in this album!"
@@ -4621,6 +4567,12 @@ msgstr ""
 msgid "Wrong path. This is the default upload/media folder path, so try to navigate from here:"
 msgstr ""
 
+msgid "The secret is empty. Please insert that value too!"
+msgstr ""
+
+msgid "The App ID is empty. Please insert that value too!"
+msgstr ""
+
 msgid "The App ID and the Secret is empty!"
 msgstr ""
 
@@ -4628,6 +4580,12 @@ msgid "The token will expire at:"
 msgstr ""
 
 msgid "Access token was not returned.Please check the credentials!"
+msgstr ""
+
+msgid "State does not match!"
+msgstr ""
+
+msgid "The token expired. Please request new token! "
 msgstr ""
 
 msgid "The token expired. Please request new token!"
@@ -4640,6 +4598,9 @@ msgid "Refresh Token"
 msgstr ""
 
 msgid "Refresh"
+msgstr ""
+
+msgid "State or code parameter is empty!"
 msgstr ""
 
 msgid "Album loading method"
@@ -4693,9 +4654,6 @@ msgid "CSV from url"
 msgstr ""
 
 msgid "CSV from input"
-msgstr ""
-
-msgid "View tweet"
 msgstr ""
 
 msgid "Comments"
@@ -5009,6 +4967,9 @@ msgid "View image"
 msgstr ""
 
 msgid "All day event"
+msgstr ""
+
+msgid "default"
 msgstr ""
 
 msgid "Fallback language"
@@ -5771,9 +5732,6 @@ msgid "Iframe url"
 msgstr ""
 
 msgid "You can disable the scroll on the iframe content."
-msgstr ""
-
-msgid "Iframe title"
 msgstr ""
 
 msgid "Image area"

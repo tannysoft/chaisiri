@@ -85,7 +85,11 @@ class ResourceTranslator {
 
             if (strpos($url, $resourceIdentifier->getUrl()) === 0) {
 
-                return $resourceIdentifier->getKeyword() . substr($url, strlen($resourceIdentifier->getUrl()));
+                $resource = $resourceIdentifier->getKeyword() . substr($url, strlen($resourceIdentifier->getUrl()));
+
+                if (strpos($resource, '$//') !== 0) {
+                    return $resource;
+                }
             }
         }
 

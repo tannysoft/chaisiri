@@ -2,7 +2,7 @@
 
 namespace Nextend\SmartSlider3\Application\Admin;
 
-use JUri;
+use Joomla\CMS\Uri\Uri;
 use Nextend\Framework\Pattern\MVCHelperTrait;
 
 trait TraitAdminUrl {

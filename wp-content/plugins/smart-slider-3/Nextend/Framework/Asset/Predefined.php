@@ -3,7 +3,7 @@
 namespace Nextend\Framework\Asset;
 
 
-use JHtml;
+use Joomla\CMS\HTML\HTMLHelper;
 use Nextend\Framework\Asset\Css\Css;
 use Nextend\Framework\Asset\Fonts\Google\Google;
 use Nextend\Framework\Asset\Js\Js;

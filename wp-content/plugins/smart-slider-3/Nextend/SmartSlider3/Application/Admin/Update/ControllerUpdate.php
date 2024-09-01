@@ -4,7 +4,7 @@
 namespace Nextend\SmartSlider3\Application\Admin\Update;
 
 
-use JRoute;
+use Joomla\CMS\Router\Route;
 use Nextend\SmartSlider3\Application\Admin\AbstractControllerAdmin;
 
 class ControllerUpdate extends AbstractControllerAdmin {

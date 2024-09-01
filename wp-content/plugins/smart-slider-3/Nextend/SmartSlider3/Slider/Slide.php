@@ -4,7 +4,7 @@
 namespace Nextend\SmartSlider3\Slider;
 
 
-use JRoute;
+use Joomla\CMS\Router\Route;
 use Nextend\Framework\Cast;
 use Nextend\Framework\Data\Data;
 use Nextend\Framework\FastImageSize\FastImageSize;

@@ -5,7 +5,7 @@ namespace Nextend\Framework;
 
 
 use Exception;
-use JHttp;
+use Joomla\CMS\Http\Http;
 use Nextend\Framework\Misc\Base64;
 use Nextend\Framework\Misc\HttpClient;
 use Nextend\Framework\Notification\Notification;
